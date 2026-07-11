@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Trasloco · Registro Scatoloni</title>
+<meta name="theme-color" content="#f6f1e7">
+<style>
+  /* ============ Design tokens ============ */
+  :root{
+    --paper:#f6f1e7;
+    --paper-2:#efe7d8;
+    --card:#fffdf8;
+    --ink:#2d2419;
+    --ink-2:#6b5d4a;
+    --ink-3:#9c8d78;
+    --line:#e2d7c3;
+    --accent:#b5502a;          /* terracotta */
+    --accent-soft:#f3ddd2;
+    --fragile:#c02626;
+    --fragile-soft:#fde8e8;
+    --ok:#3c7a46;
+
+    --f-taverna:#8a6240;  --f-taverna-soft:#f0e4d6;
+    --f-living:#3c7a46;   --f-living-soft:#e2efe2;
+    --f-camere:#3762a8;   --f-camere-soft:#e2eaf7;
+    --f-studio:#7a4fa3;   --f-studio-soft:#eee4f7;
+    --f-sottotetto:#c07c1f;--f-sottotetto-soft:#f9ecd4;
+
+    --radius:14px;
+    --shadow:0 1px 2px rgba(45,36,25,.06), 0 6px 18px rgba(45,36,25,.07);
+    --shadow-lg:0 4px 12px rgba(45,36,25,.10), 0 18px 48px rgba(45,36,25,.16);
+    --font:ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:var(--font);
+    background:
+      radial-gradient(1200px 500px at 50% -10%, #fbf8f1 0%, transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    line-height:1.5;
+    min-height:100vh;
+    padding-bottom:96px;
+  }
+
+  /* ============ Header ============ */
+  header{
+    text-align:center;
+    padding:34px 20px 10px;
+  }
+  header .logo{font-size:2rem;line-height:1}
+  header h1{
+    font-size:1.55rem;
+    letter-spacing:-.02em;
+    margin-top:6px;
+  }
+  header p{color:var(--ink-2);font-size:.92rem;margin-top:2px}
+
+  /* ============ Layout ============ */
+  main{max-width:960px;margin:0 auto;padding:12px 16px 40px}
+
+  /* ============ Stats ============ */
+  .stats{
+    display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
+    margin:14px 0 20px;
+  }
+  .stat{
+    background:var(--card);border:1px solid var(--line);border-radius:999px;
+    padding:6px 16px;font-size:.85rem;color:var(--ink-2);
+    box-shadow:var(--shadow);
+  }
+  .stat b{color:var(--ink);font-size:1rem;margin-right:4px}
+  .stat.warn b{color:var(--fragile)}
+
+  /* ============ Tabs ============ */
+  nav.tabs{
+    position:fixed;bottom:0;left:0;right:0;z-index:40;
+    display:flex;justify-content:center;gap:8px;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    background:color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);
+  }
+  nav.tabs button{
+    font:inherit;font-size:.95rem;font-weight:600;
+    border:1px solid var(--line);border-radius:999px;
+    background:var(--card);color:var(--ink-2);
+    padding:10px 22px;cursor:pointer;
+    transition:all .18s ease;
+  }
+  nav.tabs button:hover{border-color:var(--accent)}
+  nav.tabs button.active{
+    background:var(--accent);border-color:var(--accent);color:#fff;
+    box-shadow:0 4px 14px rgba(181,80,42,.35);
+  }
+
+  section.view{display:none}
+  section.view.active{display:block;animation:fadeIn .25s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ============ Search ============ */
+  .searchbar{
+    display:flex;align-items:center;gap:10px;
+    background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);
+    padding:12px 16px;margin-bottom:18px;
+    box-shadow:var(--shadow);
+    transition:border-color .18s;
+  }
+  .searchbar:focus-within{border-color:var(--accent)}
+  .searchbar .icon{font-size:1.1rem;opacity:.55}
+  .searchbar input{
+    flex:1;border:none;outline:none;background:none;font:inherit;font-size:1.05rem;color:var(--ink);
+  }
+  .searchbar input::placeholder{color:var(--ink-3)}
+  .searchbar .clear{
+    border:none;background:var(--paper-2);border-radius:50%;width:26px;height:26px;
+    cursor:pointer;color:var(--ink-2);font-size:.9rem;display:none;
+  }
+  .searchbar.has-text .clear{display:block}
+
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .chip{
+    font:inherit;font-size:.8rem;font-weight:600;
+    border:1px solid var(--line);border-radius:999px;background:var(--card);
+    color:var(--ink-2);padding:5px 13px;cursor:pointer;transition:all .15s;
+  }
+  .chip.active{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .chip.fragile-chip.active{background:var(--fragile);border-color:var(--fragile)}
+
+  /* ============ Box cards ============ */
+  .boxlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+  .boxcard{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;
+    display:flex;flex-direction:column;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .boxcard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .boxcard .top{display:flex;gap:12px;padding:14px 14px 10px}
+  .boxcard .thumb{
+    width:64px;height:64px;flex:none;border-radius:10px;
+    background:var(--paper-2);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-size:1.6rem;overflow:hidden;cursor:pointer;
+  }
+  .boxcard .thumb img{width:100%;height:100%;object-fit:cover}
+  .boxcard .head{min-width:0;flex:1}
+  .boxcard .code{
+    font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.06em;
+    color:var(--accent);background:var(--accent-soft);
+    display:inline-block;padding:1px 8px;border-radius:6px;margin-bottom:3px;
+  }
+  .boxcard h3{font-size:1.02rem;letter-spacing:-.01em;line-height:1.25;word-wrap:break-word}
+  .boxcard .contents{
+    padding:0 14px;color:var(--ink-2);font-size:.86rem;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .boxcard .contents mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 2px}
+  .boxcard .foot{
+    margin-top:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:12px 14px 13px;
+  }
+  .badge{
+    font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 10px;white-space:nowrap;
+  }
+  .badge.fragile{background:var(--fragile-soft);color:var(--fragile)}
+  .badge.floor{cursor:default}
+  .badge.unassigned{background:var(--paper-2);color:var(--ink-3);border:1px dashed var(--ink-3)}
+  .boxcard select.dest{
+    font:inherit;font-size:.78rem;font-weight:600;color:var(--ink-2);
+    border:1px solid var(--line);border-radius:8px;background:var(--paper);
+    padding:4px 6px;max-width:150px;
+  }
+  .boxcard .actions{margin-left:auto;display:flex;gap:6px}
+  .iconbtn{
+    border:1px solid var(--line);background:var(--card);border-radius:8px;
+    width:30px;height:30px;cursor:pointer;font-size:.85rem;color:var(--ink-2);
+    transition:all .15s;
+  }
+  .iconbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .iconbtn.danger:hover{border-color:var(--fragile);color:var(--fragile)}
+
+  .empty{
+    text-align:center;color:var(--ink-3);padding:60px 20px;
+  }
+  .empty .big{font-size:2.6rem;margin-bottom:8px}
+
+  /* ============ FAB ============ */
+  .fab{
+    position:fixed;right:18px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:41;
+    background:var(--accent);color:#fff;border:none;border-radius:999px;
+    font:inherit;font-size:1rem;font-weight:700;
+    padding:14px 22px;cursor:pointer;
+    box-shadow:0 6px 20px rgba(181,80,42,.4);
+    transition:transform .15s;
+  }
+  .fab:hover{transform:scale(1.05)}
+
+  /* ============ Modal / form ============ */
+  .overlay{
+    position:fixed;inset:0;z-index:50;display:none;
+    background:rgba(45,36,25,.45);backdrop-filter:blur(3px);
+    align-items:flex-end;justify-content:center;
+  }
+  .overlay.open{display:flex}
+  .sheet{
+    background:var(--card);width:100%;max-width:560px;
+    border-radius:20px 20px 0 0;
+    max-height:92vh;overflow-y:auto;
+    padding:22px 22px calc(26px + env(safe-area-inset-bottom));
+    animation:slideUp .28s cubic-bezier(.2,.9,.3,1);
+  }
+  @media(min-width:640px){
+    .overlay{align-items:center;padding:24px}
+    .sheet{border-radius:20px;box-shadow:var(--shadow-lg)}
+  }
+  @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  .sheet h2{font-size:1.25rem;letter-spacing:-.02em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .field{margin-bottom:14px}
+  .field label:not(.switch){display:block;font-size:.8rem;font-weight:700;color:var(--ink-2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+  .field input[type=text],.field textarea,.field select{
+    width:100%;font:inherit;font-size:1rem;color:var(--ink);
+    border:1.5px solid var(--line);border-radius:10px;background:var(--paper);
+    padding:10px 12px;outline:none;transition:border-color .15s;
+  }
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
+  .field textarea{min-height:88px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+  .photodrop{
+    border:2px dashed var(--line);border-radius:12px;background:var(--paper);
+    padding:14px;text-align:center;cursor:pointer;color:var(--ink-2);
+    transition:border-color .15s;position:relative;
+  }
+  .photodrop:hover{border-color:var(--accent)}
+  .photodrop img{max-width:100%;max-height:200px;border-radius:8px;display:block;margin:0 auto 8px}
+  .photodrop .hint{font-size:.85rem}
+  .photodrop .hint b{color:var(--accent)}
+  .ocrbtn{
+    margin-top:8px;font:inherit;font-size:.82rem;font-weight:600;
+    border:1px solid var(--line);border-radius:8px;background:var(--card);
+    padding:7px 14px;cursor:pointer;color:var(--ink-2);
+  }
+  .ocrbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .ocrbtn[disabled]{opacity:.55;cursor:wait}
+  .ocr-note{font-size:.75rem;color:var(--ink-3);margin-top:5px}
+
+  .switch{
+    display:flex;align-items:center;gap:12px;cursor:pointer;
+    background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;
+  }
+  .switch input{position:absolute;opacity:0;pointer-events:none}
+  .switch .track{
+    width:44px;height:26px;border-radius:999px;background:var(--line);flex:none;
+    position:relative;transition:background .18s;
+  }
+  .switch .track::after{
+    content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s;
+  }
+  .switch input:checked + .track{background:var(--fragile)}
+  .switch input:checked + .track::after{transform:translateX(18px)}
+  .switch .lbl{font-weight:600;font-size:.95rem}
+  .switch .lbl small{display:block;font-weight:400;color:var(--ink-3);font-size:.78rem}
+
+  .sheet .btns{display:flex;gap:10px;margin-top:20px}
+  .btn{
+    font:inherit;font-size:1rem;font-weight:700;border-radius:12px;cursor:pointer;
+    padding:12px 18px;border:1.5px solid var(--line);background:var(--card);color:var(--ink-2);
+    transition:all .15s;
+  }
+  .btn.primary{flex:1;background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.07)}
+
+  /* ============ House view ============ */
+  .house-wrap{
+    display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:22px;align-items:start;
+  }
+  @media(max-width:760px){.house-wrap{grid-template-columns:1fr}}
+  .house-svg{width:100%;height:auto;display:block}
+  .floor-shape{cursor:pointer;transition:filter .15s}
+  .floor-shape:hover .floor-fill{filter:brightness(.96)}
+  .floor-shape.selected .floor-fill{stroke-width:3}
+  .floor-label{font-family:var(--font);font-weight:700;pointer-events:none}
+  .floor-sub{font-family:var(--font);pointer-events:none}
+  .floor-count{font-family:var(--font);font-weight:800;pointer-events:none}
+
+  .floor-panel{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;min-height:200px;
+  }
+  .floor-panel h2{font-size:1.15rem;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .floor-panel .dot{width:14px;height:14px;border-radius:4px;flex:none}
+  .floor-panel .sub{color:var(--ink-2);font-size:.85rem;margin-bottom:14px}
+  .floor-panel ul{list-style:none}
+  .floor-panel li{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 4px;border-bottom:1px solid var(--paper-2);
+  }
+  .floor-panel li:last-child{border-bottom:none}
+  .floor-panel li .code{font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:1px 7px;border-radius:6px;flex:none}
+  .floor-panel li .nm{font-weight:600;font-size:.92rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .floor-panel li .fr{margin-left:auto;flex:none;font-size:.9rem}
+
+  /* ============ Toolbar (backup) ============ */
+  .toolbar{display:flex;gap:10px;justify-content:center;margin-top:28px;flex-wrap:wrap}
+  .toolbar .btn{font-size:.85rem;padding:8px 14px;font-weight:600}
+
+  /* ============ Lightbox ============ */
+  #lightbox{
+    position:fixed;inset:0;z-index:60;display:none;
+    background:rgba(20,15,10,.88);align-items:center;justify-content:center;cursor:zoom-out;
+  }
+  #lightbox.open{display:flex}
+  #lightbox img{max-width:94vw;max-height:92vh;border-radius:10px}
+
+  /* ============ Toast ============ */
+  #toast{
+    position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--paper);font-size:.9rem;font-weight:600;
+    padding:10px 20px;border-radius:999px;box-shadow:var(--shadow-lg);
+    opacity:0;pointer-events:none;transition:all .25s;z-index:70;white-space:nowrap;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📦</div>
+  <h1>Registro Scatoloni</h1>
+  <p>Il trasloco, sotto controllo — scatola per scatola</p>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <!-- ==================== VISTA REGISTRO ==================== -->
+  <section class="view active" id="view-registro">
+    <div class="searchbar" id="searchbar">
+      <span class="icon">🔍</span>
+      <input type="text" id="search" placeholder="Cerca un oggetto, una scatola, un codice…" autocomplete="off">
+      <button class="clear" id="searchClear" title="Pulisci">✕</button>
+    </div>
+
+    <div class="filters" id="filters"></div>
+
+    <div class="boxlist" id="boxlist"></div>
+    <div class="empty" id="emptyState" hidden>
+      <div class="big">📦</div>
+      <p><b>Nessuna scatola qui.</b><br>Tocca «+ Scatola» per fotografare la prima etichetta.</p>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" id="btnExport">⬇︎ Esporta backup</button>
+      <button class="btn" id="btnImport">⬆︎ Importa backup</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+  </section>
+
+  <!-- ==================== VISTA CASA ==================== -->
+  <section class="view" id="view-casa">
+    <div class="house-wrap">
+      <div id="houseContainer"></div>
+      <div class="floor-panel" id="floorPanel">
+        <h2>🏠 La casa nuova</h2>
+        <p class="sub">Tocca un piano per vedere le scatole destinate lì.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<button class="fab" id="fabAdd">＋ Scatola</button>
+
+<nav class="tabs">
+  <button class="active" data-view="registro">📋 Registro</button>
+  <button data-view="casa">🏠 Casa</button>
+</nav>
+
+<!-- ==================== MODAL FORM ==================== -->
+<div class="overlay" id="formOverlay">
+  <div class="sheet">
+    <h2 id="formTitle">📦 Nuova scatola</h2>
+
+    <div class="field">
+      <label>Foto dell’etichetta</label>
+      <div class="photodrop" id="photodrop">
+        <img id="photoPreview" hidden alt="Etichetta">
+        <div class="hint" id="photoHint">📷 <b>Scatta o carica</b> la foto dell’etichetta</div>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+      </div>
+      <button class="ocrbtn" id="btnOcr" hidden>✨ Leggi il testo dell’etichetta (OCR)</button>
+      <div class="ocr-note" id="ocrNote" hidden></div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Indice / codice</label>
+        <input type="text" id="fCode" placeholder="es. 12 o CUC-03">
+      </div>
+      <div class="field">
+        <label>Nome scatola</label>
+        <input type="text" id="fName" placeholder="es. Cucina — pentole">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Contenuto (come sull’etichetta)</label>
+      <textarea id="fContents" placeholder="es. pentole, coperchi, scolapasta, mestoli…"></textarea>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Fragile</label>
+        <label class="switch">
+          <input type="checkbox" id="fFragile">
+          <span class="track"></span>
+          <span class="lbl">🥃 Fragile<small>maneggiare con cura</small></span>
+        </label>
+      </div>
+      <div class="field">
+        <label>Destinazione</label>
+        <select id="fDest">
+          <option value="">— da assegnare —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btns">
+      <button class="btn" id="btnCancel">Annulla</button>
+      <button class="btn primary" id="btnSave">Salva scatola</button>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox"><img alt="Foto etichetta"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ==================== Piani della casa ==================== */
+const FLOORS = [
+  { id:'sottotetto', name:'Sottotetto',   sub:'mansarda',              icon:'🪜', color:'var(--f-sottotetto)', soft:'var(--f-sottotetto-soft)', hex:'#c07c1f', hexSoft:'#f9ecd4' },
+  { id:'studio',     name:'Piano Studio', sub:'terzo piano',           icon:'🖥️', color:'var(--f-studio)',     soft:'var(--f-studio-soft)',     hex:'#7a4fa3', hexSoft:'#eee4f7' },
+  { id:'camere',     name:'Piano Camere', sub:'secondo piano',         icon:'🛏️', color:'var(--f-camere)',     soft:'var(--f-camere-soft)',     hex:'#3762a8', hexSoft:'#e2eaf7' },
+  { id:'living',     name:'Piano Living', sub:'primo piano',           icon:'🛋️', color:'var(--f-living)',     soft:'var(--f-living-soft)',     hex:'#3c7a46', hexSoft:'#e2efe2' },
+  { id:'taverna',    name:'Taverna',      sub:'piano semi-interrato',  icon:'🍷', color:'var(--f-taverna)',    soft:'var(--f-taverna-soft)',    hex:'#8a6240', hexSoft:'#f0e4d6' },
+];
+const floorById = id => FLOORS.find(f => f.id === id);
+
+/* ==================== Stato ==================== */
+const LS_KEY = 'trasloco.boxes.v1';
+let boxes = [];
+try { boxes = JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch(e){ boxes = []; }
+
+let editingId = null;      // id scatola in modifica, null = nuova
+let photoData = null;      // dataURL foto corrente nel form
+let filterDest = 'all';    // 'all' | 'fragile' | 'none' | floorId
+let selectedFloor = null;  // piano selezionato nella vista casa
+
+function save(){
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(boxes));
+  } catch(e) {
+    toast('⚠️ Spazio pieno: foto troppo grandi. Esporta un backup.');
+  }
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+/* ==================== Utilità ==================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function highlight(text, q){
+  if(!q) return esc(text);
+  const safe = q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return esc(text).replace(new RegExp('('+safe+')','gi'), '<mark>$1</mark>');
+}
+
+/* Ordina per codice: numerico se possibile, altrimenti alfabetico */
+function sortBoxes(list){
+  return [...list].sort((a,b) => {
+    const na = parseFloat(a.code), nb = parseFloat(b.code);
+    if(!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+    return String(a.code||a.name).localeCompare(String(b.code||b.name), 'it', {numeric:true});
+  });
+}
+
+/* Comprimi la foto per non riempire localStorage */
+function compressImage(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 900;
+      let {width:w, height:h} = img;
+      if(w > MAX || h > MAX){
+        const k = MAX / Math.max(w,h);
+        w = Math.round(w*k); h = Math.round(h*k);
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', .72));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+/* ==================== Statistiche ==================== */
+function renderStats(){
+  const tot = boxes.length;
+  const fragili = boxes.filter(b => b.fragile).length;
+  const senza = boxes.filter(b => !b.dest).length;
+  $('#stats').innerHTML = `
+    <span class="stat"><b>${tot}</b> scatole</span>
+    <span class="stat warn"><b>${fragili}</b> fragili</span>
+    <span class="stat"><b>${senza}</b> da assegnare</span>`;
+}
+
+/* ==================== Filtri ==================== */
+function renderFilters(){
+  const mk = (val, label, extra='') =>
+    `<button class="chip ${extra} ${filterDest===val?'active':''}" data-f="${val}">${label}</button>`;
+  $('#filters').innerHTML =
+    mk('all','Tutte') +
+    mk('fragile','🥃 Fragili','fragile-chip') +
+    mk('none','Da assegnare') +
+    FLOORS.slice().reverse().map(f => mk(f.id, f.icon+' '+f.name)).join('');
+  $('#filters').querySelectorAll('.chip').forEach(c =>
+    c.onclick = () => { filterDest = c.dataset.f; renderAll(); });
+}
+
+/* ==================== Registro ==================== */
+function matchesQuery(b, q){
+  if(!q) return true;
+  const hay = [b.code, b.name, b.contents].join(' ').toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
+function matchesFilter(b){
+  if(filterDest === 'all') return true;
+  if(filterDest === 'fragile') return !!b.fragile;
+  if(filterDest === 'none') return !b.dest;
+  return b.dest === filterDest;
+}
+
+function renderList(){
+  const q = $('#search').value.trim();
+  $('#searchbar').classList.toggle('has-text', !!q);
+  const shown = sortBoxes(boxes.filter(b => matchesQuery(b,q) && matchesFilter(b)));
+  const list = $('#boxlist');
+
+  $('#emptyState').hidden = shown.length > 0;
+  if(shown.length === 0 && boxes.length > 0){
+    $('#emptyState').querySelector('p').innerHTML =
+      '<b>Nessun risultato.</b><br>Prova con un’altra parola o togli i filtri.';
+  } else {
+    $('#emptyState').querySelector('p').innerHTML =
+      '<b>Nessuna scatola qui.</b><br>Tocca «+ Scatola» per fotografare la prima etichetta.';
+  }
+
+  list.innerHTML = shown.map(b => {
+    const fl = floorById(b.dest);
+    const destBadge = fl
+      ? `<span class="badge floor" style="background:${fl.hexSoft};color:${fl.hex}">${fl.icon} ${fl.name}</span>`
+      : `<span class="badge unassigned">da assegnare</span>`;
+    const destSelect = `<select class="dest" data-id="${b.id}" title="Assegna destinazione">
+        <option value="">📍 destinazione…</option>
+        ${FLOORS.slice().reverse().map(f =>
+          `<option value="${f.id}" ${b.dest===f.id?'selected':''}>${f.icon} ${f.name}</option>`).join('')}
+      </select>`;
+    return `<article class="boxcard" data-id="${b.id}">
+      <div class="top">
+        <div class="thumb" data-photo="${b.id}">${b.photo ? `<img src="${b.photo}" alt="Etichetta ${esc(b.code)}">` : '📦'}</div>
+        <div class="head">
+          ${b.code ? `<span class="code">#${highlight(b.code,q)}</span>` : ''}
+          <h3>${highlight(b.name || 'Scatola senza nome', q)}</h3>
+        </div>
+      </div>
+      <p class="contents">${highlight(b.contents || '—', q)}</p>
+      <div class="foot">
+        ${b.fragile ? '<span class="badge fragile">🥃 FRAGILE</span>' : ''}
+        ${b.dest ? destBadge : destSelect}
+        <span class="actions">
+          <button class="iconbtn" data-edit="${b.id}" title="Modifica">✏️</button>
+          <button class="iconbtn danger" data-del="${b.id}" title="Elimina">🗑</button>
+        </span>
+      </div>
+    </article>`;
+  }).join('');
+
+  list.querySelectorAll('[data-edit]').forEach(el => el.onclick = () => openForm(el.dataset.edit));
+  list.querySelectorAll('[data-del]').forEach(el => el.onclick = () => delBox(el.dataset.del));
+  list.querySelectorAll('select.dest').forEach(el => el.onchange = () => {
+    const b = boxes.find(x => x.id === el.dataset.id);
+    if(b){ b.dest = el.value || null; save(); renderAll();
+      if(el.value) toast(`📍 ${b.name || '#'+b.code} → ${floorById(el.value).name}`); }
+  });
+  list.querySelectorAll('[data-photo]').forEach(el => el.onclick = () => {
+    const b = boxes.find(x => x.id === el.dataset.photo);
+    if(b && b.photo){ $('#lightbox img').src = b.photo; $('#lightbox').classList.add('open'); }
+  });
+}
+
+function delBox(id){
+  const b = boxes.find(x => x.id === id);
+  if(!b) return;
+  if(!confirm(`Eliminare la scatola ${b.code ? '#'+b.code+' ' : ''}«${b.name || 'senza nome'}»?`)) return;
+  boxes = boxes.filter(x => x.id !== id);
+  save(); renderAll();
+  toast('🗑 Scatola eliminata');
+}
+
+/* ==================== Form ==================== */
+function fillDestSelect(){
+  $('#fDest').innerHTML = '<option value="">— da assegnare —</option>' +
+    FLOORS.slice().reverse().map(f => `<option value="${f.id}">${f.icon} ${f.name} · ${f.sub}</option>`).join('');
+}
+
+function openForm(id = null){
+  editingId = id;
+  const b = id ? boxes.find(x => x.id === id) : null;
+  $('#formTitle').textContent = b ? '✏️ Modifica scatola' : '📦 Nuova scatola';
+  $('#fCode').value = b?.code || '';
+  $('#fName').value = b?.name || '';
+  $('#fContents').value = b?.contents || '';
+  $('#fFragile').checked = !!b?.fragile;
+  $('#fDest').value = b?.dest || '';
+  photoData = b?.photo || null;
+  updatePhotoUI();
+  $('#formOverlay').classList.add('open');
+  if(!b) setTimeout(() => $('#photodrop').scrollIntoView({block:'nearest'}), 50);
+}
+function closeForm(){ $('#formOverlay').classList.remove('open'); editingId = null; photoData = null; }
+
+function updatePhotoUI(){
+  const img = $('#photoPreview'), hint = $('#photoHint');
+  if(photoData){
+    img.src = photoData; img.hidden = false;
+    hint.innerHTML = '📷 Tocca per <b>sostituire</b> la foto';
+    $('#btnOcr').hidden = false;
+  } else {
+    img.hidden = true;
+    hint.innerHTML = '📷 <b>Scatta o carica</b> la foto dell’etichetta';
+    $('#btnOcr').hidden = true;
+  }
+  $('#ocrNote').hidden = true;
+}
+
+function saveForm(){
+  const data = {
+    code: $('#fCode').value.trim(),
+    name: $('#fName').value.trim(),
+    contents: $('#fContents').value.trim(),
+    fragile: $('#fFragile').checked,
+    dest: $('#fDest').value || null,
+    photo: photoData,
+  };
+  if(!data.code && !data.name && !data.contents && !data.photo){
+    toast('Inserisci almeno un codice, un nome o una foto'); return;
+  }
+  if(editingId){
+    Object.assign(boxes.find(x => x.id === editingId), data);
+    toast('✅ Scatola aggiornata');
+  } else {
+    boxes.push({ id: uid(), createdAt: Date.now(), ...data });
+    toast('✅ Scatola aggiunta al registro');
+  }
+  save(); closeForm(); renderAll();
+}
+
+/* ==================== OCR (opzionale, via CDN) ==================== */
+async function runOcr(){
+  if(!photoData) return;
+  const btn = $('#btnOcr'), note = $('#ocrNote');
+  btn.disabled = true; btn.textContent = '⏳ Lettura in corso…';
+  note.hidden = false; note.textContent = 'Scarico il motore OCR (solo la prima volta)…';
+  try {
+    if(!window.Tesseract){
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload = res; s.onerror = () => rej(new Error('rete'));
+        document.head.appendChild(s);
+      });
+    }
+    note.textContent = 'Leggo l’etichetta…';
+    const { data } = await Tesseract.recognize(photoData, 'ita');
+    const text = (data.text || '').trim();
+    if(!text){ note.textContent = 'Non ho trovato testo leggibile: compila i campi a mano.'; }
+    else {
+      const ta = $('#fContents');
+      ta.value = ta.value ? ta.value + '\n' + text : text;
+      note.textContent = 'Testo inserito nel campo Contenuto: controlla e sistema se serve.';
+      /* prova a intuire un codice tipo "12" o "A-3" dalla prima riga */
+      if(!$('#fCode').value){
+        const m = text.match(/(?:n[°.]?\s*|#\s*)?([A-Z]{0,3}[-–]?\d{1,3})\b/i);
+        if(m) $('#fCode').value = m[1].toUpperCase();
+      }
+    }
+  } catch(e) {
+    note.textContent = 'OCR non disponibile (serve internet): compila i campi a mano guardando la foto.';
+  }
+  btn.disabled = false; btn.textContent = '✨ Leggi il testo dell’etichetta (OCR)';
+}
+
+/* ==================== Vista Casa (SVG) ==================== */
+function renderHouse(){
+  const counts = {}, fragiles = {};
+  FLOORS.forEach(f => { counts[f.id] = 0; fragiles[f.id] = 0; });
+  boxes.forEach(b => {
+    if(b.dest && counts[b.dest] !== undefined){
+      counts[b.dest]++;
+      if(b.fragile) fragiles[b.dest]++;
+    }
+  });
+
+  const W = 400, FH = 78, X = 55, FW = 290;
+  /* dall'alto: sottotetto (tetto), studio, camere, living, taverna */
+  const roofTop = 26, wallTop = roofTop + 86;
+  let svg = `<svg class="house-svg" viewBox="0 0 ${W} ${wallTop + FH*4 + 60}" role="list" aria-label="Piani della casa">`;
+
+  /* sole + comignolo, per farla carina */
+  svg += `<circle cx="356" cy="34" r="17" fill="#f2c14e" opacity=".9"/>
+          <rect x="${X+FW-70}" y="${roofTop+8}" width="16" height="30" rx="2" fill="#8a6240"/>`;
+
+  FLOORS.forEach((f, i) => {
+    const n = counts[f.id], fr = fragiles[f.id];
+    const sel = selectedFloor === f.id ? 'selected' : '';
+    let shape, ly;
+
+    let labelX = X + 16, badgeX = X + FW - 34;
+
+    if(f.id === 'sottotetto'){
+      /* tetto a falde: etichetta e badge rientrati per stare dentro le falde */
+      const yb = wallTop;
+      shape = `<path class="floor-fill" d="M ${X-18} ${yb} L ${X+FW/2} ${roofTop} L ${X+FW+18} ${yb} Z"
+                fill="${f.hexSoft}" stroke="${f.hex}" stroke-width="2"/>`;
+      ly = yb - 24;
+      labelX = X + 58;
+      badgeX = X + FW - 92;
+    } else {
+      const idx = ['studio','camere','living','taverna'].indexOf(f.id);
+      const y = wallTop + idx * FH;
+      const isTav = f.id === 'taverna';
+      shape = `<rect class="floor-fill" x="${X}" y="${y}" width="${FW}" height="${FH-4}" rx="6"
+                fill="${f.hexSoft}" stroke="${f.hex}" stroke-width="2"
+                ${isTav ? 'stroke-dasharray="7 4"' : ''}/>`;
+      /* dettagli decorativi, nella fascia libera tra etichetta e badge */
+      const wy = y + 14;
+      if(isTav){
+        shape += `<rect x="${X+188}" y="${y+16}" width="26" height="12" rx="3" fill="${f.hex}" opacity=".3"/>`;
+      } else if(f.id === 'living'){
+        shape += `<rect x="${X+184}" y="${y+FH-4-42}" width="26" height="42" rx="4" fill="#8a6240"/>
+                  <circle cx="${X+204}" cy="${y+FH-4-21}" r="2.2" fill="#f2c14e"/>
+                  <rect x="${X+222}" y="${wy}" width="20" height="22" rx="3" fill="${f.hex}" opacity=".3"/>`;
+      } else {
+        shape += `<rect x="${X+186}" y="${wy}" width="20" height="22" rx="3" fill="${f.hex}" opacity=".3"/>
+                  <rect x="${X+216}" y="${wy}" width="20" height="22" rx="3" fill="${f.hex}" opacity=".3"/>`;
+      }
+      ly = y + FH/2;
+    }
+
+    const badge = n > 0
+      ? `<g>
+           <circle cx="${badgeX}" cy="${ly-2}" r="17" fill="${f.hex}"/>
+           <text class="floor-count" x="${badgeX}" y="${ly+3}" text-anchor="middle" font-size="14" fill="#fff">${n}</text>
+         </g>
+         ${fr > 0 ? (f.id === 'sottotetto'
+            ? `<text x="${badgeX-26}" y="${ly+2}" text-anchor="end" font-size="10" fill="var(--fragile)">🥃 ${fr}</text>`
+            : `<text x="${badgeX}" y="${ly+28}" text-anchor="middle" font-size="10" fill="var(--fragile)">🥃 ${fr}</text>`) : ''}`
+      : `<text x="${badgeX}" y="${ly+3}" text-anchor="middle" font-size="12" fill="${f.hex}" opacity=".55">–</text>`;
+
+    svg += `<g class="floor-shape ${sel}" data-floor="${f.id}" role="listitem" tabindex="0"
+             aria-label="${f.name}, ${n} scatole">
+      ${shape}
+      <text class="floor-label" x="${labelX}" y="${ly-2}" font-size="15" fill="${f.hex}">${f.icon} ${f.name}</text>
+      <text class="floor-sub" x="${labelX}" y="${ly+15}" font-size="10.5" fill="var(--ink-3)">${f.sub}</text>
+      ${badge}
+    </g>`;
+  });
+
+  /* linea del terreno solo ai lati della casa: la taverna è semi-interrata */
+  const gy = wallTop + FH*3 + Math.round(FH*0.45);
+  svg += `<line x1="8" y1="${gy}" x2="${X-8}" y2="${gy}" stroke="#7d9a5e" stroke-width="3" stroke-linecap="round"/>
+          <line x1="${X+FW+8}" y1="${gy}" x2="${W-8}" y2="${gy}" stroke="#7d9a5e" stroke-width="3" stroke-linecap="round"/>
+          <text x="12" y="${gy+16}" font-size="9.5" fill="#7d9a5e">🌱 terreno</text>`;
+
+  svg += `</svg>`;
+  $('#houseContainer').innerHTML = svg;
+
+  $('#houseContainer').querySelectorAll('.floor-shape').forEach(g => {
+    const go = () => {
+      selectedFloor = g.dataset.floor; renderHouse(); renderFloorPanel();
+      if(window.innerWidth <= 760) $('#floorPanel').scrollIntoView({behavior:'smooth', block:'start'});
+    };
+    g.onclick = go;
+    g.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } };
+  });
+}
+
+function renderFloorPanel(){
+  const panel = $('#floorPanel');
+  if(!selectedFloor){
+    panel.innerHTML = `<h2>🏠 La casa nuova</h2>
+      <p class="sub">Tocca un piano per vedere le scatole destinate lì.</p>`;
+    return;
+  }
+  const f = floorById(selectedFloor);
+  const list = sortBoxes(boxes.filter(b => b.dest === f.id));
+  panel.innerHTML = `
+    <h2><span class="dot" style="background:${f.hex}"></span>${f.icon} ${f.name}</h2>
+    <p class="sub">${f.sub} · ${list.length} ${list.length === 1 ? 'scatola' : 'scatole'}${
+      list.some(b=>b.fragile) ? ` · <span style="color:var(--fragile);font-weight:700">🥃 ${list.filter(b=>b.fragile).length} fragili</span>` : ''}</p>
+    ${list.length === 0
+      ? '<p style="color:var(--ink-3);padding:16px 0">Ancora nessuna scatola destinata a questo piano.</p>'
+      : '<ul>' + list.map(b => `
+        <li>
+          ${b.code ? `<span class="code">#${esc(b.code)}</span>` : ''}
+          <span class="nm">${esc(b.name || 'senza nome')}</span>
+          <span class="fr">${b.fragile ? '🥃' : ''}</span>
+        </li>`).join('') + '</ul>'}`;
+}
+
+/* ==================== Backup ==================== */
+function exportBackup(){
+  const blob = new Blob([JSON.stringify({ v:1, exportedAt:new Date().toISOString(), boxes }, null, 1)],
+    { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `trasloco-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('⬇︎ Backup scaricato');
+}
+function importBackup(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(r.result);
+      const arr = Array.isArray(data) ? data : data.boxes;
+      if(!Array.isArray(arr)) throw new Error();
+      const byId = new Map(boxes.map(b => [b.id, b]));
+      let added = 0;
+      arr.forEach(b => { if(b && b.id && !byId.has(b.id)){ boxes.push(b); added++; } });
+      save(); renderAll();
+      toast(`⬆︎ Importate ${added} scatole`);
+    } catch(e){ toast('⚠️ File di backup non valido'); }
+  };
+  r.readAsText(file);
+}
+
+/* ==================== Render globale + eventi ==================== */
+function renderAll(){
+  renderStats();
+  renderFilters();
+  renderList();
+  renderHouse();
+  renderFloorPanel();
+}
+
+document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav.tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('section.view').forEach(v => v.classList.remove('active'));
+  $('#view-' + b.dataset.view).classList.add('active');
+});
+
+$('#search').addEventListener('input', renderList);
+$('#searchClear').onclick = () => { $('#search').value = ''; renderList(); $('#search').focus(); };
+
+$('#fabAdd').onclick = () => openForm();
+$('#btnCancel').onclick = closeForm;
+$('#btnSave').onclick = saveForm;
+$('#formOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeForm(); });
+
+$('#photodrop').onclick = () => $('#photoInput').click();
+$('#photoInput').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  try {
+    photoData = await compressImage(file);
+    updatePhotoUI();
+  } catch(err){ toast('⚠️ Impossibile leggere la foto'); }
+};
+$('#btnOcr').onclick = runOcr;
+
+$('#lightbox').onclick = () => $('#lightbox').classList.remove('open');
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){ closeForm(); $('#lightbox').classList.remove('open'); }
+});
+
+$('#btnExport').onclick = exportBackup;
+$('#btnImport').onclick = () => $('#importFile').click();
+$('#importFile').onchange = e => { if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; };
+
+fillDestSelect();
+renderAll();
+</script>
+</body>
+</html>
