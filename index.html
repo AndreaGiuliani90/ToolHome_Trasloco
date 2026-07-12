@@ -111,26 +111,30 @@
     box-shadow:0 8px 12px -10px rgba(27,32,29,.28);
   }
 
-  /* ============ Tabs ============ */
+  /* ============ Tab bar (icona + etichetta, non pillole) ============ */
   nav.tabs{
     position:fixed;bottom:0;left:0;right:0;z-index:40;
-    display:flex;justify-content:center;gap:8px;
-    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
-    background:color-mix(in srgb, var(--paper) 88%, transparent);
-    backdrop-filter:blur(12px);
+    display:flex;
+    padding-bottom:env(safe-area-inset-bottom);
+    background:color-mix(in srgb, var(--card) 92%, transparent);
+    backdrop-filter:blur(14px);
     border-top:1px solid var(--line);
   }
   nav.tabs button{
-    font:inherit;font-size:.95rem;font-weight:600;
-    border:1px solid var(--line);border-radius:999px;
-    background:var(--card);color:var(--ink-2);
-    padding:10px 22px;cursor:pointer;
-    transition:all .18s ease;
+    flex:1;position:relative;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    font:inherit;font-size:.7rem;font-weight:600;letter-spacing:.01em;
+    border:none;background:none;color:var(--ink-3);
+    padding:9px 4px 8px;cursor:pointer;
+    transition:color .15s ease;
   }
-  nav.tabs button:hover{border-color:var(--accent)}
-  nav.tabs button.active{
-    background:var(--accent);border-color:var(--accent);color:#fff;
-    box-shadow:0 4px 14px rgba(39,74,122,.32);
+  nav.tabs button .ic{font-size:1.35rem;line-height:1;transition:transform .15s ease}
+  nav.tabs button:hover{color:var(--ink-2)}
+  nav.tabs button.active{color:var(--accent)}
+  nav.tabs button.active .ic{transform:translateY(-1px)}
+  nav.tabs button.active::before{
+    content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:30px;height:3px;border-radius:0 0 3px 3px;background:var(--accent);
   }
 
   section.view{display:none}
@@ -158,6 +162,21 @@
   .searchbar.has-text .clear{display:block}
 
   .filters{display:flex;gap:8px;flex-wrap:wrap}
+  .filter-select{
+    display:none;width:100%;font:inherit;font-size:.95rem;font-weight:600;
+    color:var(--ink);background:var(--card);
+    border:1.5px solid var(--line);border-radius:var(--radius);
+    padding:11px 14px;cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234e5a54' stroke-width='3' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+  .filter-select:focus{outline:none;border-color:var(--accent)}
+  /* su schermi stretti: tendina al posto dei chip (occupano meno spazio) */
+  @media(max-width:560px){
+    .filters{display:none}
+    .filter-select{display:block}
+  }
   .boxlist{margin-top:16px}
   .chip{
     font:inherit;font-size:.8rem;font-weight:600;
@@ -352,8 +371,7 @@
   .floor-panel li .fr{margin-left:auto;flex:none;font-size:.9rem}
 
   /* ============ Toolbar (backup) ============ */
-  .tools{max-width:560px;margin:32px auto 0}
-  .tools-title{font-family:var(--mono);font-size:.75rem;color:var(--ink-2);text-align:center;margin-bottom:14px;font-weight:600;text-transform:uppercase;letter-spacing:var(--eyebrow)}
+  .tools{max-width:560px;margin:8px auto 0}
   .toolrow{
     width:100%;display:flex;align-items:center;gap:13px;text-align:left;
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
@@ -414,6 +432,7 @@
         <button class="clear" id="searchClear" title="Pulisci">✕</button>
       </div>
       <div class="filters" id="filters"></div>
+      <select class="filter-select" id="filterSelect" aria-label="Filtra le scatole"></select>
     </div>
 
     <div class="boxlist" id="boxlist"></div>
@@ -422,9 +441,22 @@
       <p><b>Nessuna scatola qui.</b><br>Tocca «+ Scatola» per fotografare la prima etichetta.</p>
     </div>
 
-    <div class="tools">
-      <h2 class="tools-title">⚙️ Impostazioni</h2>
+  </section>
 
+  <!-- ==================== VISTA CASA ==================== -->
+  <section class="view" id="view-casa">
+    <div class="house-wrap">
+      <div id="houseContainer"></div>
+      <div class="floor-panel" id="floorPanel">
+        <h2>🏠 La casa nuova</h2>
+        <p class="sub">Tocca un piano per vedere le scatole destinate lì.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== VISTA IMPOSTAZIONI ==================== -->
+  <section class="view" id="view-settings">
+    <div class="tools">
       <button class="toolrow" id="btnSync">
         <span class="tr-ico">☁️</span>
         <span class="tr-txt"><b>Sincronizza tra dispositivi</b>
@@ -463,24 +495,14 @@
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </section>
-
-  <!-- ==================== VISTA CASA ==================== -->
-  <section class="view" id="view-casa">
-    <div class="house-wrap">
-      <div id="houseContainer"></div>
-      <div class="floor-panel" id="floorPanel">
-        <h2>🏠 La casa nuova</h2>
-        <p class="sub">Tocca un piano per vedere le scatole destinate lì.</p>
-      </div>
-    </div>
-  </section>
 </main>
 
 <button class="fab" id="fabAdd">＋ Scatola</button>
 
 <nav class="tabs">
-  <button class="active" data-view="registro">📋 Registro</button>
-  <button data-view="casa">🏠 Casa</button>
+  <button class="active" data-view="registro"><span class="ic">📋</span>Registro</button>
+  <button data-view="casa"><span class="ic">🏠</span>Casa</button>
+  <button data-view="settings"><span class="ic">⚙️</span>Impostazioni</button>
 </nav>
 
 <!-- ==================== MODAL FORM ==================== -->
@@ -751,15 +773,31 @@ function renderStats(){
 
 /* ==================== Filtri ==================== */
 function renderFilters(){
-  const mk = (val, label, extra='') =>
-    `<button class="chip ${extra} ${filterDest===val?'active':''}" data-f="${val}">${label}</button>`;
-  $('#filters').innerHTML =
-    mk('all','Tutte') +
-    mk('fragile','🥃 Fragili','fragile-chip') +
-    mk('none','Da assegnare') +
-    FLOORS.slice().reverse().map(f => mk(f.id, f.icon+' '+f.name)).join('');
+  /* opzioni condivise tra chip (PC) e tendina (mobile) */
+  const opts = [
+    ['all', 'Tutte', '📋'],
+    ['fragile', 'Fragili', '🥃'],
+    ['none', 'Da assegnare', '📍'],
+    ...FLOORS.slice().reverse().map(f => [f.id, f.name, f.icon]),
+  ];
+  const setFilter = v => { filterDest = v; renderAll(); };
+
+  /* chip (desktop) */
+  $('#filters').innerHTML = opts.map(([val, label, icon]) =>
+    `<button class="chip ${val==='fragile'?'fragile-chip':''} ${filterDest===val?'active':''}"
+       data-f="${val}">${icon} ${label}</button>`).join('');
   $('#filters').querySelectorAll('.chip').forEach(c =>
-    c.onclick = () => { filterDest = c.dataset.f; renderAll(); });
+    c.onclick = () => setFilter(c.dataset.f));
+
+  /* tendina (mobile) */
+  const cur = opts.find(o => o[0] === filterDest) || opts[0];
+  const sel = $('#filterSelect');
+  sel.innerHTML = opts.map(([val, label, icon]) =>
+    `<option value="${val}" ${filterDest===val?'selected':''}>${icon} ${
+      val==='all' ? 'Tutte le scatole' : val==='fragile' ? 'Solo fragili'
+      : val==='none' ? 'Da assegnare' : 'Piano: '+label}</option>`).join('');
+  sel.value = filterDest;
+  sel.onchange = () => setFilter(sel.value);
 }
 
 /* ==================== Registro ==================== */
@@ -1608,12 +1646,17 @@ function renderAll(){
   renderFloorPanel();
 }
 
-document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('nav.tabs button').forEach(x => x.classList.remove('active'));
-  b.classList.add('active');
+function switchView(view){
+  document.querySelectorAll('nav.tabs button').forEach(x =>
+    x.classList.toggle('active', x.dataset.view === view));
   document.querySelectorAll('section.view').forEach(v => v.classList.remove('active'));
-  $('#view-' + b.dataset.view).classList.add('active');
-});
+  $('#view-' + view).classList.add('active');
+  /* il "+ Scatola" ha senso solo dove si consultano le scatole */
+  $('#fabAdd').style.display = view === 'settings' ? 'none' : '';
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav.tabs button').forEach(b =>
+  b.onclick = () => switchView(b.dataset.view));
 
 $('#search').addEventListener('input', renderList);
 $('#searchClear').onclick = () => { $('#search').value = ''; renderList(); $('#search').focus(); };
