@@ -12,9 +12,17 @@ dispositivo (localStorage).
 
 ### Registro
 - **＋ Scatola** — scatta o carica la foto dell'etichetta, poi compila
-  indice/codice, nome e contenuto. Il pulsante **OCR** prova a leggere il
-  testo dell'etichetta e pre-compilare il campo contenuto (richiede
-  internet la prima volta; il testo va comunque ricontrollato).
+  indice/codice, nome e contenuto (oppure lascia fare all'AI, vedi sotto).
+- **✨ Lettura AI dell'etichetta** — con una chiave API di Claude
+  (Anthropic) l'app invia la foto dell'etichetta al modello, che compila
+  automaticamente codice, nome, contenuto, flag fragile e destinazione
+  (se scritta sull'etichetta). Funziona anche con la scrittura a mano.
+  Setup: crea un account su [console.anthropic.com](https://console.anthropic.com),
+  aggiungi un piccolo credito, genera una chiave in **API Keys** e
+  incollala nel pulsante **🔑 Chiave AI** dell'app. La chiave resta
+  salvata solo sul dispositivo; ogni lettura costa circa 1 centesimo.
+  In alternativa il pulsante **OCR di base** prova a leggere il testo
+  senza AI (gratis ma molto meno preciso, specie a mano libera).
 - **🥃 Fragile** — attiva l'interruttore per le scatole delicate: la
   scatola viene marcata con il badge FRAGILE ovunque compaia.
 - **Ricerca** — il campo in alto cerca in tempo reale tra codici, nomi e

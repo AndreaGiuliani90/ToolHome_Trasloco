@@ -250,6 +250,14 @@
   }
   .ocrbtn:hover{border-color:var(--accent);color:var(--accent)}
   .ocrbtn[disabled]{opacity:.55;cursor:wait}
+  .aibtn{
+    background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;
+    margin-right:8px;
+  }
+  .aibtn:hover{filter:brightness(1.07);color:#fff}
+  .keyinfo{font-size:.88rem;color:var(--ink-2);margin-bottom:14px;line-height:1.55}
+  .keyinfo a{color:var(--accent);font-weight:600}
+  .keyinfo ol{margin:8px 0 0 20px}
   .ocr-note{font-size:.75rem;color:var(--ink-3);margin-top:5px}
 
   .switch{
@@ -362,6 +370,7 @@
     <div class="toolbar">
       <button class="btn" id="btnExport">⬇︎ Esporta backup</button>
       <button class="btn" id="btnImport">⬆︎ Importa backup</button>
+      <button class="btn" id="btnKey">🔑 Chiave AI</button>
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </section>
@@ -397,7 +406,8 @@
         <div class="hint" id="photoHint">📷 <b>Scatta o carica</b> la foto dell’etichetta</div>
         <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
       </div>
-      <button class="ocrbtn" id="btnOcr" hidden>✨ Leggi il testo dell’etichetta (OCR)</button>
+      <button class="ocrbtn aibtn" id="btnAi" hidden>✨ Leggi l’etichetta con l’AI</button>
+      <button class="ocrbtn" id="btnOcr" hidden>🔤 OCR di base (senza AI)</button>
       <div class="ocr-note" id="ocrNote" hidden></div>
     </div>
 
@@ -437,6 +447,32 @@
     <div class="btns">
       <button class="btn" id="btnCancel">Annulla</button>
       <button class="btn primary" id="btnSave">Salva scatola</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL CHIAVE AI ==================== -->
+<div class="overlay" id="keyOverlay">
+  <div class="sheet">
+    <h2>🔑 Lettura etichette con l’AI</h2>
+    <p class="keyinfo">
+      L’app può inviare la foto dell’etichetta a <b>Claude</b> (Anthropic), che compila
+      da solo codice, nome, contenuto, flag fragile e destinazione. Serve una chiave
+      API personale — costa circa <b>1 centesimo a etichetta</b>:
+      <ol>
+        <li>Vai su <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> e registrati</li>
+        <li>Aggiungi un piccolo credito (Billing)</li>
+        <li>Crea una chiave in <b>API Keys</b> e incollala qui sotto</li>
+      </ol>
+      La chiave resta salvata <b>solo su questo dispositivo</b>.
+    </p>
+    <div class="field">
+      <label>Chiave API</label>
+      <input type="password" id="fKey" placeholder="sk-ant-…" autocomplete="off">
+    </div>
+    <div class="btns">
+      <button class="btn" id="btnKeyCancel">Annulla</button>
+      <button class="btn primary" id="btnKeySave">Salva chiave</button>
     </div>
   </div>
 </div>
@@ -657,10 +693,12 @@ function updatePhotoUI(){
   if(photoData){
     img.src = photoData; img.hidden = false;
     hint.innerHTML = '📷 Tocca per <b>sostituire</b> la foto';
-    $('#btnOcr').hidden = false;
+    $('#btnAi').hidden = !AI_AVAILABLE;
+    $('#btnOcr').hidden = !AI_AVAILABLE;
   } else {
     img.hidden = true;
     hint.innerHTML = '📷 <b>Scatta o carica</b> la foto dell’etichetta';
+    $('#btnAi').hidden = true;
     $('#btnOcr').hidden = true;
   }
   $('#ocrNote').hidden = true;
@@ -686,6 +724,101 @@ function saveForm(){
     toast('✅ Scatola aggiunta al registro');
   }
   save(); closeForm(); renderAll();
+}
+
+/* ==================== Lettura etichetta con l'AI (API Claude) ==================== */
+const AI_AVAILABLE = true;   /* false nella versione di anteprima (rete esterna bloccata) */
+const KEY_LS = 'trasloco.claudeKey';
+const getApiKey = () => { try { return localStorage.getItem(KEY_LS) || ''; } catch(e){ return ''; } };
+
+function openKeySheet(){
+  $('#fKey').value = getApiKey();
+  $('#keyOverlay').classList.add('open');
+}
+function closeKeySheet(){ $('#keyOverlay').classList.remove('open'); }
+function saveKey(){
+  const k = $('#fKey').value.trim();
+  if(k) localStorage.setItem(KEY_LS, k); else localStorage.removeItem(KEY_LS);
+  closeKeySheet();
+  toast(k ? '🔑 Chiave salvata su questo dispositivo' : 'Chiave rimossa');
+}
+
+/* Schema della risposta: structured outputs garantiscono JSON valido */
+const LABEL_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['code', 'name', 'contents', 'fragile', 'destination'],
+  properties: {
+    code: { type: 'string', description: "Indice o codice della scatola (es. '12' o 'CUC-03'). Stringa vuota se non presente." },
+    name: { type: 'string', description: 'Nome o titolo breve della scatola. Stringa vuota se non presente.' },
+    contents: { type: 'string', description: "Contenuto elencato sull'etichetta, voci separate da virgola. Stringa vuota se non presente." },
+    fragile: { type: 'boolean', description: "true solo se l'etichetta riporta FRAGILE o un simbolo equivalente (bicchiere, ecc.)" },
+    destination: {
+      type: 'string',
+      enum: ['taverna', 'living', 'camere', 'studio', 'sottotetto', 'sconosciuta'],
+      description: "Piano di destinazione SOLO se scritto sull'etichetta, altrimenti 'sconosciuta'",
+    },
+  },
+};
+
+async function runAi(){
+  if(!photoData) return;
+  if(!getApiKey()){ openKeySheet(); return; }
+  const btn = $('#btnAi'), note = $('#ocrNote');
+  btn.disabled = true; btn.textContent = '⏳ Claude sta leggendo…';
+  note.hidden = false; note.textContent = 'Invio la foto a Claude…';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': getApiKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-8',
+        max_tokens: 1000,
+        output_config: { format: { type: 'json_schema', schema: LABEL_SCHEMA } },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: photoData.split(',')[1] } },
+            { type: 'text', text: "Questa è la foto dell'etichetta di uno scatolone di un trasloco, con testo in italiano spesso scritto a mano. Trascrivi fedelmente ciò che l'etichetta riporta nei campi richiesti. Non inventare informazioni che non sono scritte." },
+          ],
+        }],
+      }),
+    });
+    if(res.status === 401) throw { kind: 'auth' };
+    if(!res.ok){
+      const err = await res.json().catch(() => null);
+      throw { kind: 'api', msg: (err && err.error && err.error.message) || ('errore HTTP ' + res.status) };
+    }
+    const data = await res.json();
+    if(data.stop_reason === 'refusal') throw { kind: 'api', msg: 'lettura rifiutata dal servizio' };
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    const out = JSON.parse(textBlock.text);
+
+    if(out.code && !$('#fCode').value) $('#fCode').value = out.code;
+    if(out.name && !$('#fName').value) $('#fName').value = out.name;
+    if(out.contents){
+      const ta = $('#fContents');
+      ta.value = ta.value ? ta.value + '\n' + out.contents : out.contents;
+    }
+    if(out.fragile) $('#fFragile').checked = true;
+    if(out.destination && out.destination !== 'sconosciuta' && !$('#fDest').value) $('#fDest').value = out.destination;
+    note.textContent = '✅ Etichetta letta: controlla i campi e correggi se serve.';
+  } catch(e) {
+    if(e && e.kind === 'auth'){
+      note.textContent = 'Chiave API non valida: controlla di averla copiata per intero.';
+      openKeySheet();
+    } else if(e && e.kind === 'api'){
+      note.textContent = 'Il servizio AI ha risposto con un errore: ' + e.msg;
+    } else {
+      note.textContent = 'Impossibile contattare Claude: controlla la connessione (nell’anteprima su claude.ai la rete esterna è bloccata) e riprova, oppure compila i campi a mano.';
+    }
+  }
+  btn.disabled = false; btn.textContent = '✨ Leggi l’etichetta con l’AI';
 }
 
 /* ==================== OCR (opzionale, via CDN) ==================== */
@@ -999,10 +1132,17 @@ $('#photoInput').onchange = async e => {
   } catch(err){ toast('⚠️ Impossibile leggere la foto'); }
 };
 $('#btnOcr').onclick = runOcr;
+$('#btnAi').onclick = runAi;
+
+$('#btnKey').onclick = openKeySheet;
+$('#btnKey').hidden = !AI_AVAILABLE;
+$('#btnKeyCancel').onclick = closeKeySheet;
+$('#btnKeySave').onclick = saveKey;
+$('#keyOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeKeySheet(); });
 
 $('#lightbox').onclick = () => $('#lightbox').classList.remove('open');
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape'){ closeForm(); $('#lightbox').classList.remove('open'); }
+  if(e.key === 'Escape'){ closeForm(); closeKeySheet(); $('#lightbox').classList.remove('open'); }
 });
 
 $('#btnExport').onclick = exportBackup;
