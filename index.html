@@ -18,7 +18,7 @@
     --card:#fbfcf9;
     --ink:#1b201d;             /* quasi-nero verde-grigio, non nero puro */
     --ink-2:#4e5a54;
-    --ink-3:#6d766f;
+    --ink-3:#586159;
     --line:#cfd5cb;
     --accent:#274a7a;          /* blu inchiostro (timbro/manifest) */
     --accent-soft:#dde5f1;
@@ -37,7 +37,7 @@
     --radius:10px;
     --shadow:0 1px 2px rgba(27,32,29,.05), 0 4px 12px rgba(27,32,29,.06);
     --shadow-lg:0 4px 14px rgba(27,32,29,.09), 0 16px 40px rgba(27,32,29,.14);
-    --font:system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font:system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     --font-hand:"Caveat", "Segoe Print", "Bradley Hand", "Chalkboard SE", cursive;
     --mono:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
     --eyebrow:.07em;          /* letter-spacing per etichette in maiuscolo */
@@ -79,23 +79,37 @@
   /* ============ Layout ============ */
   main{max-width:960px;margin:0 auto;padding:12px 16px 40px}
 
-  /* ============ Stats ============ */
+  /* ============ Stats (readout piatto, NON cliccabile) ============ */
   .stats{
-    display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
-    margin:14px 0 20px;
+    display:flex;align-items:center;justify-content:center;flex-wrap:wrap;
+    gap:6px 0;margin:12px 0 16px;color:var(--ink-2);font-size:.85rem;
   }
-  .stat{
-    background:var(--card);border:1px solid var(--line);border-radius:999px;
-    padding:6px 16px;font-size:.85rem;color:var(--ink-2);
-    box-shadow:var(--shadow);
+  .stat{padding:0 15px;position:relative;white-space:nowrap}
+  .stat + .stat::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    height:15px;width:1px;background:var(--line);
   }
-  .stat b{color:var(--ink);font-size:1rem;margin-right:4px}
+  .stat b{font-family:var(--mono);color:var(--ink);font-size:1.05rem;font-weight:700;margin-right:5px}
   .stat.warn b{color:var(--fragile)}
-  .syncchip{font:inherit;cursor:pointer;transition:border-color .15s}
-  .syncchip:hover{border-color:var(--accent)}
-  .syncchip.err b{color:var(--fragile)}
-  .syncchip.ok b{color:var(--ok)}
-  .syncchip.off{border-style:dashed;color:var(--ink-3)}
+  /* la pillola dello stato sync è un pulsante: forma ovale = cliccabile */
+  .syncbtn{
+    font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;
+    border:1px solid var(--line);border-radius:999px;background:var(--card);
+    color:var(--ink-2);padding:5px 13px;margin-left:8px;transition:border-color .15s;
+  }
+  .syncbtn:hover{border-color:var(--accent)}
+  .syncbtn b{font-family:var(--mono)}
+  .syncbtn.err b{color:var(--fragile)}
+  .syncbtn.ok b{color:var(--ok)}
+  .syncbtn.off{border-style:dashed;color:var(--ink-3)}
+
+  /* ============ Controlli fissi (ricerca + filtri) ============ */
+  .controls{
+    position:sticky;top:0;z-index:30;
+    background:var(--paper);
+    margin:0 -16px;padding:8px 16px 10px;
+    box-shadow:0 8px 12px -10px rgba(27,32,29,.28);
+  }
 
   /* ============ Tabs ============ */
   nav.tabs{
@@ -127,7 +141,7 @@
   .searchbar{
     display:flex;align-items:center;gap:10px;
     background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);
-    padding:12px 16px;margin-bottom:18px;
+    padding:12px 16px;margin-bottom:10px;
     box-shadow:var(--shadow);
     transition:border-color .18s;
   }
@@ -143,7 +157,8 @@
   }
   .searchbar.has-text .clear{display:block}
 
-  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap}
+  .boxlist{margin-top:16px}
   .chip{
     font:inherit;font-size:.8rem;font-weight:600;
     border:1px solid var(--line);border-radius:999px;background:var(--card);
@@ -242,7 +257,7 @@
   @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
   .sheet h2{font-size:1.25rem;letter-spacing:-.02em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
   .field{margin-bottom:14px}
-  .field label:not(.switch){display:block;font-size:.8rem;font-weight:700;color:var(--ink-2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+  .field label:not(.switch){display:block;font-size:.82rem;font-weight:700;color:var(--ink-2);margin-bottom:5px}
   .field input[type=text],.field textarea,.field select{
     width:100%;font:inherit;font-size:1rem;color:var(--ink);
     border:1.5px solid var(--line);border-radius:10px;background:var(--paper);
@@ -384,7 +399,7 @@
   <div class="eyebrow">Bolla di trasloco</div>
   <div class="logo">📦</div>
   <h1>Registro Scatoloni</h1>
-  <p>Il trasloco, sotto controllo — scatola per scatola</p>
+  <p>Il trasloco sotto controllo, scatola per scatola</p>
 </header>
 
 <main>
@@ -392,13 +407,14 @@
 
   <!-- ==================== VISTA REGISTRO ==================== -->
   <section class="view active" id="view-registro">
-    <div class="searchbar" id="searchbar">
-      <span class="icon">🔍</span>
-      <input type="text" id="search" placeholder="Cerca un oggetto, una scatola, un codice…" autocomplete="off">
-      <button class="clear" id="searchClear" title="Pulisci">✕</button>
+    <div class="controls">
+      <div class="searchbar" id="searchbar">
+        <span class="icon">🔍</span>
+        <input type="text" id="search" placeholder="Cerca un oggetto, una scatola, un codice…" autocomplete="off">
+        <button class="clear" id="searchClear" title="Pulisci">✕</button>
+      </div>
+      <div class="filters" id="filters"></div>
     </div>
-
-    <div class="filters" id="filters"></div>
 
     <div class="boxlist" id="boxlist"></div>
     <div class="empty" id="emptyState" hidden>
@@ -475,7 +491,7 @@
     <div class="field">
       <label>Foto dell’etichetta</label>
       <div class="photodrop" id="photodrop">
-        <img id="photoPreview" hidden alt="Etichetta">
+        <img id="photoPreview" hidden alt="Etichetta" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
         <div class="hint" id="photoHint">📷 <b>Scatta o carica</b> la foto dell’etichetta</div>
         <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
       </div>
@@ -491,7 +507,7 @@
       </div>
       <div class="field">
         <label>Nome scatola</label>
-        <input type="text" id="fName" placeholder="es. Cucina — pentole">
+        <input type="text" id="fName" placeholder="es. Cucina, pentole">
       </div>
     </div>
 
@@ -512,7 +528,7 @@
       <div class="field">
         <label>Destinazione</label>
         <select id="fDest">
-          <option value="">— da assegnare —</option>
+          <option value="">da assegnare…</option>
         </select>
       </div>
     </div>
@@ -535,7 +551,7 @@
       <ol>
         <li>Su <a href="https://github.com/new" target="_blank" rel="noopener">github.com/new</a> crea un repository <b>Private</b>, es. <code>trasloco-dati</code></li>
         <li>Su GitHub: Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token. In “Repository access” scegli <b>solo</b> <code>trasloco-dati</code>; in “Permissions” imposta <b>Contents: Read and write</b></li>
-        <li>Incolla repository e token qui sotto — <b>su ogni dispositivo</b> che vuoi collegare</li>
+        <li>Incolla repository e token qui sotto, <b>su ogni dispositivo</b> che vuoi collegare</li>
       </ol>
     </p>
     <div class="field">
@@ -554,7 +570,7 @@
     <div class="field-hint" style="text-align:center;margin-top:14px">
       Sincronizzazione già attiva?
       <a href="#" id="lnkSyncOff" style="color:var(--fragile);font-weight:600">Scollega questo dispositivo</a>
-      <br>(smette di sincronizzare qui — le scatole restano sia sul dispositivo sia nel cloud, non si cancella niente).
+      <br>(smette di sincronizzare qui; le scatole restano sia sul dispositivo sia nel cloud, non si cancella niente).
     </div>
   </div>
 </div>
@@ -587,7 +603,7 @@
     <h2>👋 Benvenuto nel trasloco</h2>
     <p class="keyinfo" id="inviteIntro">
       Hai aperto un link d’invito al <b>Registro Scatoloni</b>. Configuro l’app
-      per collegarti allo stesso archivio condiviso — così vedi e aggiorni le
+      per collegarti allo stesso archivio condiviso, così vedi e aggiorni le
       stesse scatole degli altri, senza inserire nulla.
     </p>
     <div class="btns">
@@ -604,7 +620,7 @@
     <p class="keyinfo">
       L’app può inviare la foto dell’etichetta a <b>Claude</b> (Anthropic), che compila
       da solo codice, nome, contenuto, flag fragile e destinazione. Serve una chiave
-      API personale — costa circa <b>1 centesimo a etichetta</b>:
+      API personale (costa circa <b>1 centesimo a etichetta</b>):
       <ol>
         <li>Vai su <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> e registrati</li>
         <li>Aggiungi un piccolo credito (Billing)</li>
@@ -624,7 +640,7 @@
   </div>
 </div>
 
-<div id="lightbox"><img alt="Foto etichetta"></div>
+<div id="lightbox"><img alt="Foto etichetta" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></div>
 <div id="toast"></div>
 
 <script>
@@ -720,9 +736,9 @@ function renderStats(){
       const icon = syncStatus === 'err' ? '⚠️' : syncStatus === 'sync' ? '…' : '✓';
       const title = syncStatus === 'err' ? 'Errore di sincronizzazione: tocca per controllare'
                   : syncStatus === 'sync' ? 'Sincronizzazione in corso…' : 'Sincronizzato';
-      chip = `<button class="stat syncchip ${syncStatus}" id="syncChip" title="${title}">☁️ <b>${icon}</b></button>`;
+      chip = `<button class="syncbtn ${syncStatus}" id="syncChip" title="${title}">☁️ <b>${icon}</b></button>`;
     } else {
-      chip = `<button class="stat syncchip off" id="syncChip">☁️ attiva sync</button>`;
+      chip = `<button class="syncbtn off" id="syncChip">☁️ attiva sync</button>`;
     }
   }
   $('#stats').innerHTML = `
@@ -834,7 +850,7 @@ function delBox(id){
 
 /* ==================== Form ==================== */
 function fillDestSelect(){
-  $('#fDest').innerHTML = '<option value="">— da assegnare —</option>' +
+  $('#fDest').innerHTML = '<option value="">da assegnare…</option>' +
     FLOORS.slice().reverse().map(f => `<option value="${f.id}">${f.icon} ${f.name} · ${f.sub}</option>`).join('');
 }
 
