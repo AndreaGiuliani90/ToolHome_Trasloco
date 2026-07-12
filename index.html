@@ -377,6 +377,7 @@
       <button class="btn" id="btnImport">⬆︎ Importa backup</button>
       <button class="btn" id="btnKey">🔑 Chiave AI</button>
       <button class="btn" id="btnSync">☁️ Sync</button>
+      <button class="btn" id="btnShare">📲 Condividi accesso</button>
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </section>
@@ -482,6 +483,44 @@
     <div class="btns">
       <button class="btn" id="btnSyncOff">Disattiva</button>
       <button class="btn primary" id="btnSyncSave">Salva e sincronizza</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL CONDIVIDI ACCESSO ==================== -->
+<div class="overlay" id="shareOverlay">
+  <div class="sheet">
+    <h2>📲 Condividi accesso</h2>
+    <p class="keyinfo" id="shareIntro">
+      Crea un link da mandare (es. su WhatsApp) ai tuoi familiari: chi lo apre
+      si ritrova l’app <b>già configurata</b>, senza inserire token né chiavi.
+      Il link contiene le tue credenziali: mandalo <b>solo a persone fidate</b> e
+      non pubblicarlo. Chi lo riceve accede allo stesso registro e può
+      modificarlo.
+    </p>
+    <div class="field" id="shareLinkField" hidden>
+      <label>Link d’invito</label>
+      <textarea id="fShareLink" readonly style="min-height:96px;font-family:var(--mono);font-size:.8rem;word-break:break-all"></textarea>
+    </div>
+    <div class="btns">
+      <button class="btn" id="btnShareClose">Chiudi</button>
+      <button class="btn primary" id="btnShareGen">Crea link d’invito</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL ACCETTA INVITO ==================== -->
+<div class="overlay" id="inviteOverlay">
+  <div class="sheet">
+    <h2>👋 Benvenuto nel trasloco</h2>
+    <p class="keyinfo" id="inviteIntro">
+      Hai aperto un link d’invito al <b>Registro Scatoloni</b>. Configuro l’app
+      per collegarti allo stesso archivio condiviso — così vedi e aggiorni le
+      stesse scatole degli altri, senza inserire nulla.
+    </p>
+    <div class="btns">
+      <button class="btn" id="btnInviteNo">Annulla</button>
+      <button class="btn primary" id="btnInviteYes">Collega questo dispositivo</button>
     </div>
   </div>
 </div>
@@ -1366,6 +1405,105 @@ function disableSync(){
   toast('Sincronizzazione disattivata (i dati restano sul dispositivo)');
 }
 
+/* ==================== Condivisione accesso (link d'invito) ==================== */
+function openShareSheet(){
+  $('#shareLinkField').hidden = true;
+  $('#btnShareGen').hidden = false;
+  if(!ghOn()){
+    $('#shareIntro').innerHTML = 'Prima attiva la <b>sincronizzazione</b> (☁️ Sync) su questo '
+      + 'dispositivo: il link d’invito serve proprio a passare quella configurazione '
+      + '(e la chiave AI, se impostata) agli altri senza reinserirla.';
+    $('#btnShareGen').hidden = true;
+  } else {
+    $('#shareIntro').innerHTML = 'Crea un link da mandare (es. su WhatsApp) ai tuoi familiari: chi lo apre '
+      + 'si ritrova l’app <b>già configurata</b>, senza inserire token né chiavi. '
+      + 'Il link contiene le tue credenziali: mandalo <b>solo a persone fidate</b> e '
+      + 'non pubblicarlo. Chi lo riceve accede allo stesso registro e può modificarlo.';
+  }
+  $('#shareOverlay').classList.add('open');
+}
+function closeShareSheet(){ $('#shareOverlay').classList.remove('open'); }
+
+function buildInviteLink(){
+  const payload = { v: 1, repo: gh.repo, token: gh.token };
+  const key = getApiKey();
+  if(key) payload.key = key;
+  const packed = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');   /* URL-safe */
+  const base = location.origin + location.pathname;
+  return base + '#invito=' + packed;
+}
+
+async function generateInvite(){
+  if(!ghOn()) return;
+  const link = buildInviteLink();
+  $('#fShareLink').value = link;
+  $('#shareLinkField').hidden = false;
+  $('#btnShareGen').hidden = true;
+  const shareData = {
+    title: 'Registro Scatoloni — trasloco',
+    text: 'Apri questo link per accedere al registro condiviso degli scatoloni del trasloco:',
+    url: link,
+  };
+  if(navigator.share){
+    try { await navigator.share(shareData); return; } catch(e){ /* annullato: mostra comunque il link */ }
+  }
+  try {
+    await navigator.clipboard.writeText(link);
+    toast('🔗 Link copiato: incollalo in WhatsApp');
+  } catch(e){
+    $('#fShareLink').focus(); $('#fShareLink').select();
+    toast('Tocca e tieni premuto sul link per copiarlo');
+  }
+}
+
+/* ---- lato ricevente: rileva #invito=… all'apertura ---- */
+let pendingInvite = null;
+function parseInvite(){
+  const m = (location.hash || '').match(/[#&]invito=([^&]+)/);
+  if(!m) return null;
+  try {
+    let b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    while(b64.length % 4) b64 += '=';
+    const data = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    if(data && data.repo && data.token) return data;
+  } catch(e){}
+  return null;
+}
+function clearInviteHash(){
+  history.replaceState(null, '', location.origin + location.pathname);
+}
+function maybeShowInvite(){
+  pendingInvite = parseInvite();
+  if(!pendingInvite) return;
+  const already = ghOn() && gh.repo === pendingInvite.repo;
+  $('#inviteIntro').innerHTML = already
+    ? 'Questo dispositivo è già collegato a <b>' + esc(pendingInvite.repo) + '</b>. '
+      + 'Vuoi aggiornare token' + (pendingInvite.key ? ' e chiave AI' : '') + ' da questo invito?'
+    : 'Hai aperto un link d’invito al <b>Registro Scatoloni</b>. Configuro l’app per '
+      + 'collegarti all’archivio condiviso <b>' + esc(pendingInvite.repo) + '</b> — così vedi e '
+      + 'aggiorni le stesse scatole degli altri, senza inserire nulla.';
+  $('#inviteOverlay').classList.add('open');
+}
+function acceptInvite(){
+  if(!pendingInvite) return;
+  gh = { repo: pendingInvite.repo, token: pendingInvite.token };
+  try { localStorage.setItem(GH_LS, JSON.stringify(gh)); } catch(e){}
+  if(pendingInvite.key){ try { localStorage.setItem(KEY_LS, pendingInvite.key); } catch(e){} }
+  $('#inviteOverlay').classList.remove('open');
+  clearInviteHash();
+  pendingInvite = null;
+  boxes.forEach(b => { if(b.photo && !b.photoSynced) b.hasPhoto = true; });
+  toast('✅ Dispositivo collegato: sto scaricando le scatole…');
+  renderStats();
+  syncNow();
+}
+function declineInvite(){
+  $('#inviteOverlay').classList.remove('open');
+  clearInviteHash();
+  pendingInvite = null;
+}
+
 /* ==================== Render globale + eventi ==================== */
 function renderAll(){
   renderStats();
@@ -1415,6 +1553,16 @@ $('#btnSyncOff').onclick = disableSync;
 $('#btnSyncSave').onclick = saveSyncSettings;
 $('#syncOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeSyncSheet(); });
 
+$('#btnShare').onclick = openShareSheet;
+$('#btnShare').hidden = !AI_AVAILABLE;
+$('#btnShareGen').onclick = generateInvite;
+$('#btnShareClose').onclick = closeShareSheet;
+$('#shareOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeShareSheet(); });
+$('#fShareLink').onclick = function(){ this.select(); };
+
+$('#btnInviteYes').onclick = acceptInvite;
+$('#btnInviteNo').onclick = declineInvite;
+
 /* riallinea quando l'app torna in primo piano (es. passi dal telefono al laptop) */
 document.addEventListener('visibilitychange', () => {
   if(!document.hidden && ghOn() && Date.now() - lastSyncAt > 15000) scheduleSync(400);
@@ -1422,7 +1570,7 @@ document.addEventListener('visibilitychange', () => {
 
 $('#lightbox').onclick = () => $('#lightbox').classList.remove('open');
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape'){ closeForm(); closeKeySheet(); closeSyncSheet(); $('#lightbox').classList.remove('open'); }
+  if(e.key === 'Escape'){ closeForm(); closeKeySheet(); closeSyncSheet(); closeShareSheet(); $('#lightbox').classList.remove('open'); }
 });
 
 $('#btnExport').onclick = exportBackup;
@@ -1431,7 +1579,8 @@ $('#importFile').onchange = e => { if(e.target.files[0]) importBackup(e.target.f
 
 fillDestSelect();
 renderAll();
-if(ghOn()) syncNow();
+maybeShowInvite();
+if(ghOn() && !pendingInvite) syncNow();
 </script>
 </body>
 </html>

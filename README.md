@@ -66,6 +66,24 @@ piano. Se modifichi da due dispositivi, vince la modifica più recente
 per ciascuna scatola. Il chip ☁️ in alto mostra lo stato (✓ sincronizzato,
 … in corso, ⚠️ errore).
 
+### Condividi accesso con un link 📲
+Per non riconfigurare ogni dispositivo a mano (e per farlo usare a
+familiari senza competenze tecniche), il pulsante **📲 Condividi accesso**
+genera un **link d'invito**: chi lo apre si ritrova l'app già configurata
+(sincronizzazione + chiave AI), senza inserire nulla.
+
+- Configura una volta il tuo dispositivo (Sync e, se vuoi, Chiave AI),
+  poi tocca **Condividi accesso** → **Crea link d'invito** e mandalo
+  (WhatsApp, ecc.) alle persone di fiducia.
+- Il link contiene le credenziali codificate nella parte dopo `#`, che
+  **non viene inviata ai server** e non finisce mai nel codice pubblico
+  dell'app. All'apertura, il ricevente conferma e le credenziali vengono
+  salvate solo sul suo dispositivo; l'indirizzo viene poi ripulito.
+- **Attenzione**: chiunque abbia il link accede allo stesso registro e
+  può modificarlo — condividilo solo con persone fidate e non pubblicarlo.
+  Per revocare l'accesso, rigenera il token su GitHub (Settings →
+  Developer settings) e ricondividi un nuovo link.
+
 ### Backup
 I pulsanti **Esporta / Importa backup** salvano e ripristinano l'intero
 registro (foto comprese) come file JSON: utile come copia di sicurezza
