@@ -78,6 +78,11 @@
   }
   .stat b{color:var(--ink);font-size:1rem;margin-right:4px}
   .stat.warn b{color:var(--fragile)}
+  .syncchip{font:inherit;cursor:pointer;transition:border-color .15s}
+  .syncchip:hover{border-color:var(--accent)}
+  .syncchip.err b{color:var(--fragile)}
+  .syncchip.ok b{color:var(--ok)}
+  .syncchip.off{border-style:dashed;color:var(--ink-3)}
 
   /* ============ Tabs ============ */
   nav.tabs{
@@ -371,6 +376,7 @@
       <button class="btn" id="btnExport">⬇︎ Esporta backup</button>
       <button class="btn" id="btnImport">⬆︎ Importa backup</button>
       <button class="btn" id="btnKey">🔑 Chiave AI</button>
+      <button class="btn" id="btnSync">☁️ Sync</button>
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </section>
@@ -447,6 +453,35 @@
     <div class="btns">
       <button class="btn" id="btnCancel">Annulla</button>
       <button class="btn primary" id="btnSave">Salva scatola</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL SYNC ==================== -->
+<div class="overlay" id="syncOverlay">
+  <div class="sheet">
+    <h2>☁️ Sincronizza tra dispositivi</h2>
+    <p class="keyinfo">
+      Il registro (foto comprese) viene salvato in un <b>repository GitHub privato</b>:
+      ogni modifica va online da sola e gli altri dispositivi la scaricano
+      all’apertura. Setup, una volta sola:
+      <ol>
+        <li>Su <a href="https://github.com/new" target="_blank" rel="noopener">github.com/new</a> crea un repository <b>Private</b>, es. <code>trasloco-dati</code></li>
+        <li>Su GitHub: Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token. In “Repository access” scegli <b>solo</b> <code>trasloco-dati</code>; in “Permissions” imposta <b>Contents: Read and write</b></li>
+        <li>Incolla repository e token qui sotto — <b>su ogni dispositivo</b> che vuoi collegare</li>
+      </ol>
+    </p>
+    <div class="field">
+      <label>Repository (utente/nome)</label>
+      <input type="text" id="fGhRepo" placeholder="AndreaGiuliani90/trasloco-dati" autocomplete="off" autocapitalize="off">
+    </div>
+    <div class="field">
+      <label>Token GitHub</label>
+      <input type="password" id="fGhToken" placeholder="github_pat_…" autocomplete="off">
+    </div>
+    <div class="btns">
+      <button class="btn" id="btnSyncOff">Disattiva</button>
+      <button class="btn primary" id="btnSyncSave">Salva e sincronizza</button>
     </div>
   </div>
 </div>
@@ -567,10 +602,23 @@ function renderStats(){
   const tot = boxes.length;
   const fragili = boxes.filter(b => b.fragile).length;
   const senza = boxes.filter(b => !b.dest).length;
+  let chip = '';
+  if(AI_AVAILABLE){
+    if(gh.token && gh.repo){
+      const icon = syncStatus === 'err' ? '⚠️' : syncStatus === 'sync' ? '…' : '✓';
+      const title = syncStatus === 'err' ? 'Errore di sincronizzazione: tocca per controllare'
+                  : syncStatus === 'sync' ? 'Sincronizzazione in corso…' : 'Sincronizzato';
+      chip = `<button class="stat syncchip ${syncStatus}" id="syncChip" title="${title}">☁️ <b>${icon}</b></button>`;
+    } else {
+      chip = `<button class="stat syncchip off" id="syncChip">☁️ attiva sync</button>`;
+    }
+  }
   $('#stats').innerHTML = `
     <span class="stat"><b>${tot}</b> scatole</span>
     <span class="stat warn"><b>${fragili}</b> fragili</span>
-    <span class="stat"><b>${senza}</b> da assegnare</span>`;
+    <span class="stat"><b>${senza}</b> da assegnare</span>${chip}`;
+  const sc = $('#syncChip');
+  if(sc) sc.onclick = openSyncSheet;
 }
 
 /* ==================== Filtri ==================== */
@@ -648,13 +696,16 @@ function renderList(){
   list.querySelectorAll('[data-del]').forEach(el => el.onclick = () => delBox(el.dataset.del));
   list.querySelectorAll('select.dest').forEach(el => el.onchange = () => {
     const b = boxes.find(x => x.id === el.dataset.id);
-    if(b){ b.dest = el.value || null; save(); renderAll();
+    if(b){ b.dest = el.value || null; b.updatedAt = Date.now(); save(); renderAll(); scheduleSync();
       if(el.value) toast(`📍 ${b.name || '#'+b.code} → ${floorById(el.value).name}`); }
   });
   list.querySelectorAll('[data-photo]').forEach(el => el.onclick = () => {
     const b = boxes.find(x => x.id === el.dataset.photo);
     if(b && b.photo){ $('#lightbox img').src = b.photo; $('#lightbox').classList.add('open'); }
   });
+
+  /* foto presenti nel cloud ma non ancora su questo dispositivo */
+  shown.forEach(b => { if(b.hasPhoto && !b.photo) ensurePhoto(b); });
 }
 
 function delBox(id){
@@ -662,7 +713,10 @@ function delBox(id){
   if(!b) return;
   if(!confirm(`Eliminare la scatola ${b.code ? '#'+b.code+' ' : ''}«${b.name || 'senza nome'}»?`)) return;
   boxes = boxes.filter(x => x.id !== id);
-  save(); renderAll();
+  tombstones.push({ id, at: Date.now() });
+  try { localStorage.setItem(TOMB_LS, JSON.stringify(tombstones)); } catch(e){}
+  if(b.photoSynced) deleteRemotePhoto(id);
+  save(); renderAll(); scheduleSync();
   toast('🗑 Scatola eliminata');
 }
 
@@ -682,6 +736,7 @@ function openForm(id = null){
   $('#fFragile').checked = !!b?.fragile;
   $('#fDest').value = b?.dest || '';
   photoData = b?.photo || null;
+  if(b && b.hasPhoto && !b.photo) ensurePhoto(b);
   updatePhotoUI();
   $('#formOverlay').classList.add('open');
   if(!b) setTimeout(() => $('#photodrop').scrollIntoView({block:'nearest'}), 50);
@@ -711,19 +766,31 @@ function saveForm(){
     contents: $('#fContents').value.trim(),
     fragile: $('#fFragile').checked,
     dest: $('#fDest').value || null,
-    photo: photoData,
+    updatedAt: Date.now(),
   };
-  if(!data.code && !data.name && !data.contents && !data.photo){
+  const old = editingId ? boxes.find(x => x.id === editingId) : null;
+  const keepsRemotePhoto = old && old.hasPhoto && !old.photo && !photoData;
+  if(!data.code && !data.name && !data.contents && !photoData && !keepsRemotePhoto){
     toast('Inserisci almeno un codice, un nome o una foto'); return;
   }
-  if(editingId){
-    Object.assign(boxes.find(x => x.id === editingId), data);
+  if(old){
+    const photoChanged = (photoData || null) !== (old.photo || null);
+    Object.assign(old, data);
+    if(photoChanged && !keepsRemotePhoto){
+      old.photo = photoData;
+      old.hasPhoto = !!photoData;
+      old.photoSynced = false;
+    }
     toast('✅ Scatola aggiornata');
   } else {
-    boxes.push({ id: uid(), createdAt: Date.now(), ...data });
+    boxes.push({
+      id: uid(), createdAt: Date.now(),
+      photo: photoData, hasPhoto: !!photoData, photoSynced: false,
+      ...data,
+    });
     toast('✅ Scatola aggiunta al registro');
   }
-  save(); closeForm(); renderAll();
+  save(); closeForm(); renderAll(); scheduleSync();
 }
 
 /* ==================== Lettura etichetta con l'AI (API Claude) ==================== */
@@ -1090,11 +1157,199 @@ function importBackup(file){
       const byId = new Map(boxes.map(b => [b.id, b]));
       let added = 0;
       arr.forEach(b => { if(b && b.id && !byId.has(b.id)){ boxes.push(b); added++; } });
-      save(); renderAll();
+      save(); renderAll(); scheduleSync();
       toast(`⬆︎ Importate ${added} scatole`);
     } catch(e){ toast('⚠️ File di backup non valido'); }
   };
   r.readAsText(file);
+}
+
+/* ==================== Sincronizzazione su GitHub ==================== */
+const GH_LS = 'trasloco.gh', TOMB_LS = 'trasloco.deleted';
+let gh = {};        try { gh = JSON.parse(localStorage.getItem(GH_LS)) || {}; } catch(e){}
+let tombstones = []; try { tombstones = JSON.parse(localStorage.getItem(TOMB_LS)) || []; } catch(e){}
+const ghOn = () => AI_AVAILABLE && !!(gh.token && gh.repo);
+
+let syncStatus = 'ok', syncTimer = null, syncing = false, pendingSync = false, lastSyncAt = 0;
+function setSyncStatus(s){ syncStatus = s; renderStats(); }
+
+function ghReq(path, opts = {}){
+  return fetch('https://api.github.com/repos/' + gh.repo + '/contents/' + path, {
+    ...opts,
+    headers: {
+      'authorization': 'Bearer ' + gh.token,
+      'accept': 'application/vnd.github+json',
+      ...(opts.body ? { 'content-type': 'application/json' } : {}),
+    },
+  });
+}
+const b64enc = s => btoa(unescape(encodeURIComponent(s)));
+const b64dec = s => decodeURIComponent(escape(atob(s.replace(/\n/g, ''))));
+
+/* forma canonica per confronti e per il file remoto (senza foto inline) */
+const normBox = b => ({
+  id: b.id, code: b.code || '', name: b.name || '', contents: b.contents || '',
+  fragile: !!b.fragile, dest: b.dest || null,
+  createdAt: b.createdAt || 0, updatedAt: b.updatedAt || b.createdAt || 0,
+  hasPhoto: !!(b.hasPhoto || b.photo),
+});
+const normDoc = d => JSON.stringify({
+  boxes: (d.boxes || []).map(normBox).sort((a, b) => a.id < b.id ? -1 : 1),
+  deleted: (d.deleted || []).map(t => ({ id: t.id, at: t.at })).sort((a, b) => a.id < b.id ? -1 : 1),
+});
+const exportRemoteDoc = () => ({
+  v: 2, updatedAt: Date.now(),
+  boxes: boxes.map(normBox),
+  deleted: tombstones,
+});
+
+/* fonde il documento remoto nel registro locale (vince l'updatedAt più recente) */
+function mergeRemote(remote){
+  const tombMap = new Map(tombstones.map(t => [t.id, t.at]));
+  (remote.deleted || []).forEach(t => {
+    if(!tombMap.has(t.id) || t.at > tombMap.get(t.id)) tombMap.set(t.id, t.at);
+  });
+  const byId = new Map(boxes.map(b => [b.id, b]));
+  (remote.boxes || []).forEach(rb => {
+    const lb = byId.get(rb.id);
+    if(!lb){
+      byId.set(rb.id, { ...rb, photo: null, photoSynced: !!rb.hasPhoto });
+    } else if((rb.updatedAt || 0) > (lb.updatedAt || 0)){
+      byId.set(rb.id, { ...lb, ...rb, photo: lb.photo, hasPhoto: !!(rb.hasPhoto || lb.photo) });
+    }
+  });
+  for(const [id, at] of tombMap){
+    const b = byId.get(id);
+    if(b && at > (b.updatedAt || 0)) byId.delete(id);
+  }
+  boxes = [...byId.values()];
+  tombstones = [...tombMap].map(([id, at]) => ({ id, at }));
+  try { localStorage.setItem(TOMB_LS, JSON.stringify(tombstones)); } catch(e){}
+}
+
+async function pushPhotos(){
+  for(const b of boxes){
+    if(!(b.photo && !b.photoSynced)) continue;
+    const path = 'foto/' + b.id + '.jpg';
+    const body = { message: 'Foto etichetta ' + (b.code || b.id), content: b.photo.split(',')[1] };
+    let put = await ghReq(path, { method: 'PUT', body: JSON.stringify(body) });
+    if(put.status === 422){          /* il file esiste già: serve lo sha */
+      const g = await ghReq(path);
+      if(g.status === 200){
+        body.sha = (await g.json()).sha;
+        put = await ghReq(path, { method: 'PUT', body: JSON.stringify(body) });
+      }
+    }
+    if(!put.ok) throw new Error('caricamento foto: HTTP ' + put.status);
+    b.photoSynced = true; b.hasPhoto = true;
+    save();
+  }
+}
+
+async function deleteRemotePhoto(id){
+  if(!ghOn()) return;
+  try {
+    const g = await ghReq('foto/' + id + '.jpg');
+    if(g.status === 200){
+      const sha = (await g.json()).sha;
+      await ghReq('foto/' + id + '.jpg', { method: 'DELETE', body: JSON.stringify({ message: 'Rimuovi foto', sha }) });
+    }
+  } catch(e){}
+}
+
+/* scarica una foto mancante dal repository (lazy, con cache locale) */
+const photoFetching = new Set();
+async function ensurePhoto(b){
+  if(!ghOn() || b.photo || !b.hasPhoto || photoFetching.has(b.id)) return;
+  photoFetching.add(b.id);
+  try {
+    const g = await ghReq('foto/' + b.id + '.jpg');
+    if(g.status === 200){
+      b.photo = 'data:image/jpeg;base64,' + (await g.json()).content.replace(/\n/g, '');
+      b.photoSynced = true;
+      save(); renderList();
+      if(editingId === b.id && !photoData){ photoData = b.photo; updatePhotoUI(); }
+    }
+  } catch(e){}
+  photoFetching.delete(b.id);
+}
+
+async function syncNow(retrying){
+  if(!ghOn()) return;
+  if(syncing){ pendingSync = true; return; }
+  syncing = true; setSyncStatus('sync');
+  try {
+    /* 1. scarica lo stato remoto */
+    let sha = null, remote = null;
+    const res = await ghReq('registro.json');
+    if(res.status === 200){
+      const j = await res.json();
+      sha = j.sha;
+      remote = JSON.parse(b64dec(j.content));
+    } else if(res.status === 401 || res.status === 403){
+      throw new Error('token non valido o senza permessi');
+    } else if(res.status !== 404){
+      throw new Error('HTTP ' + res.status);
+    }
+    /* 2. fondi nel locale */
+    if(remote){
+      const before = normDoc({ boxes, deleted: tombstones });
+      mergeRemote(remote);
+      if(normDoc({ boxes, deleted: tombstones }) !== before){ save(); renderAll(); }
+    }
+    /* 3. carica se il locale è diverso dal remoto */
+    const doc = exportRemoteDoc();
+    if(!remote || normDoc(doc) !== normDoc(remote)){
+      const body = { message: 'Aggiorna registro scatoloni', content: b64enc(JSON.stringify(doc)) };
+      if(sha) body.sha = sha;
+      const put = await ghReq('registro.json', { method: 'PUT', body: JSON.stringify(body) });
+      if((put.status === 409 || put.status === 422) && !retrying){
+        syncing = false;
+        return syncNow(true);       /* conflitto: riscarica e riprova una volta */
+      }
+      if(!put.ok) throw new Error('HTTP ' + put.status);
+    }
+    /* 4. foto nuove */
+    await pushPhotos();
+    lastSyncAt = Date.now();
+    setSyncStatus('ok');
+  } catch(e) {
+    setSyncStatus('err');
+    console.warn('sync:', e);
+  }
+  syncing = false;
+  if(pendingSync){ pendingSync = false; scheduleSync(500); }
+}
+
+function scheduleSync(ms = 2500){
+  if(!ghOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, ms);
+}
+
+function openSyncSheet(){
+  $('#fGhRepo').value = gh.repo || '';
+  $('#fGhToken').value = gh.token || '';
+  $('#syncOverlay').classList.add('open');
+}
+function closeSyncSheet(){ $('#syncOverlay').classList.remove('open'); }
+function saveSyncSettings(){
+  const repo = $('#fGhRepo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, '');
+  const token = $('#fGhToken').value.trim();
+  if(!repo || !token || !repo.includes('/')){ toast('Servono repository (utente/nome) e token'); return; }
+  gh = { repo, token };
+  try { localStorage.setItem(GH_LS, JSON.stringify(gh)); } catch(e){}
+  closeSyncSheet();
+  toast('☁️ Sincronizzazione attivata');
+  /* le scatole già esistenti vanno ricaricate con le foto */
+  boxes.forEach(b => { if(b.photo && !b.photoSynced) b.hasPhoto = true; });
+  syncNow();
+}
+function disableSync(){
+  gh = {};
+  localStorage.removeItem(GH_LS);
+  closeSyncSheet(); renderStats();
+  toast('Sincronizzazione disattivata (i dati restano sul dispositivo)');
 }
 
 /* ==================== Render globale + eventi ==================== */
@@ -1140,9 +1395,20 @@ $('#btnKeyCancel').onclick = closeKeySheet;
 $('#btnKeySave').onclick = saveKey;
 $('#keyOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeKeySheet(); });
 
+$('#btnSync').onclick = openSyncSheet;
+$('#btnSync').hidden = !AI_AVAILABLE;
+$('#btnSyncOff').onclick = disableSync;
+$('#btnSyncSave').onclick = saveSyncSettings;
+$('#syncOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeSyncSheet(); });
+
+/* riallinea quando l'app torna in primo piano (es. passi dal telefono al laptop) */
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && ghOn() && Date.now() - lastSyncAt > 15000) scheduleSync(400);
+});
+
 $('#lightbox').onclick = () => $('#lightbox').classList.remove('open');
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape'){ closeForm(); closeKeySheet(); $('#lightbox').classList.remove('open'); }
+  if(e.key === 'Escape'){ closeForm(); closeKeySheet(); closeSyncSheet(); $('#lightbox').classList.remove('open'); }
 });
 
 $('#btnExport').onclick = exportBackup;
@@ -1151,6 +1417,7 @@ $('#importFile').onchange = e => { if(e.target.files[0]) importBackup(e.target.f
 
 fillDestSelect();
 renderAll();
+if(ghOn()) syncNow();
 </script>
 </body>
 </html>

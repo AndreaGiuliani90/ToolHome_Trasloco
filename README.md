@@ -47,10 +47,29 @@ piano riporta il numero di scatole destinate (e quante fragili). Toccando
 un piano si apre l'elenco delle sue scatole — perfetto il giorno del
 trasloco per dirottare al volo ogni scatolone che arriva.
 
+### Sincronizzazione tra dispositivi ☁️
+Con il pulsante **☁️ Sync** il registro (foto comprese) viene salvato in
+un repository GitHub privato e condiviso tra telefono, laptop e qualsiasi
+altro dispositivo. Setup una tantum:
+
+1. Crea un repository **privato** su [github.com/new](https://github.com/new),
+   es. `trasloco-dati`
+2. Genera un token: GitHub → Settings → Developer settings →
+   **Fine-grained tokens** → Generate new token, con accesso al solo
+   repository `trasloco-dati` e permesso **Contents: Read and write**
+3. Nell'app, tocca **☁️ Sync** e incolla repository e token
+   (su ogni dispositivo da collegare)
+
+Da quel momento ogni modifica viene caricata automaticamente (pochi
+secondi dopo) e scaricata all'apertura dell'app o al ritorno in primo
+piano. Se modifichi da due dispositivi, vince la modifica più recente
+per ciascuna scatola. Il chip ☁️ in alto mostra lo stato (✓ sincronizzato,
+… in corso, ⚠️ errore).
+
 ### Backup
 I pulsanti **Esporta / Importa backup** salvano e ripristinano l'intero
-registro (foto comprese) come file JSON: utile per passare i dati da un
-dispositivo all'altro o per sicurezza.
+registro (foto comprese) come file JSON: utile come copia di sicurezza
+in aggiunta alla sincronizzazione.
 
 ## Pubblicazione (opzionale)
 
