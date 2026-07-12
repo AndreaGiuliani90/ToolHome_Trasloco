@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Trasloco · Registro Scatoloni</title>
 <meta name="theme-color" content="#f6f1e7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 <style>
   /* ============ Design tokens ============ */
   :root{
@@ -31,6 +34,7 @@
     --shadow:0 1px 2px rgba(45,36,25,.06), 0 6px 18px rgba(45,36,25,.07);
     --shadow-lg:0 4px 12px rgba(45,36,25,.10), 0 18px 48px rgba(45,36,25,.16);
     --font:ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-hand:"Caveat", "Segoe Print", "Bradley Hand", "Chalkboard SE", cursive;
     --mono:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -282,11 +286,12 @@
   @media(max-width:760px){.house-wrap{grid-template-columns:1fr}}
   .house-svg{width:100%;height:auto;display:block}
   .floor-shape{cursor:pointer;transition:filter .15s}
-  .floor-shape:hover .floor-fill{filter:brightness(.96)}
-  .floor-shape.selected .floor-fill{stroke-width:3}
-  .floor-label{font-family:var(--font);font-weight:700;pointer-events:none}
-  .floor-sub{font-family:var(--font);pointer-events:none}
+  .floor-shape:hover .floor-fill{filter:brightness(.95)}
+  .floor-shape.selected .floor-fill{stroke-width:4}
+  .floor-label{font-family:var(--font-hand);font-weight:700;pointer-events:none}
+  .floor-sub{font-family:var(--font-hand);font-weight:600;pointer-events:none}
   .floor-count{font-family:var(--font);font-weight:800;pointer-events:none}
+  .floor-deco{pointer-events:none}
 
   .floor-panel{
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
@@ -718,7 +723,7 @@ async function runOcr(){
   btn.disabled = false; btn.textContent = '✨ Leggi il testo dell’etichetta (OCR)';
 }
 
-/* ==================== Vista Casa (SVG) ==================== */
+/* ==================== Vista Casa (SVG, stile disegno a mano) ==================== */
 function renderHouse(){
   const counts = {}, fragiles = {};
   FLOORS.forEach(f => { counts[f.id] = 0; fragiles[f.id] = 0; });
@@ -729,76 +734,171 @@ function renderHouse(){
     }
   });
 
-  const W = 400, FH = 78, X = 55, FW = 290;
-  /* dall'alto: sottotetto (tetto), studio, camere, living, taverna */
-  const roofTop = 26, wallTop = roofTop + 86;
-  let svg = `<svg class="house-svg" viewBox="0 0 ${W} ${wallTop + FH*4 + 60}" role="list" aria-label="Piani della casa">`;
+  const INK = '#4a3a28', GLOW = '#ffedb0', GRASS = '#6f9a52', SOIL = '#c9b898';
+  const L = 84, R = 356, PEAK = [220,52], EAVL = [64,148], EAVR = [376,148];
+  const gy = 418;                         /* linea del terreno */
+  const Y = { studio:[148,226], camere:[226,304], living:[304,386], taverna:[386,458] };
 
-  /* sole + comignolo, per farla carina */
-  svg += `<circle cx="356" cy="34" r="17" fill="#f2c14e" opacity=".9"/>
-          <rect x="${X+FW-70}" y="${roofTop+8}" width="16" height="30" rx="2" fill="#8a6240"/>`;
+  /* tratto "a mano": jitter deterministico (stabile tra i re-render) */
+  const jit = (x, y, a=2) => {
+    const s = Math.sin(x*12.9898 + y*78.233) * 43758.5453;
+    return (s - Math.floor(s) - .5) * 2 * a;
+  };
+  const wp = (pts, close=true) => {          /* poligono/linea dal tratto tremolante */
+    let d = '';
+    for(let i = 0; i < pts.length; i++){
+      const [x1,y1] = pts[i], [x2,y2] = pts[(i+1) % pts.length];
+      if(i === 0) d = `M ${(x1+jit(x1,y1)).toFixed(1)} ${(y1+jit(y1,x1)).toFixed(1)}`;
+      if(!close && i === pts.length-1) break;
+      const mx = (x1+x2)/2, my = (y1+y2)/2;
+      d += ` Q ${(mx+jit(mx,my,3)).toFixed(1)} ${(my+jit(my,mx,3)).toFixed(1)} ${(x2+jit(x2,y2)).toFixed(1)} ${(y2+jit(y2,x2)).toFixed(1)}`;
+    }
+    return close ? d + ' Z' : d;
+  };
+  const wrect = (x,y,w,h) => wp([[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
+  const wline = (x1,y1,x2,y2) => wp([[x1,y1],[x2,y2]], false);
+  const wcirc = (cx,cy,r) => {
+    const pts = [];
+    for(let i = 0; i < 8; i++){
+      const a = i/8 * 2*Math.PI;
+      pts.push([cx + Math.cos(a)*r, cy + Math.sin(a)*r]);
+    }
+    return wp(pts);
+  };
 
-  FLOORS.forEach((f, i) => {
+  /* finestra illuminata con croce; persiane; fioriera */
+  const win = (x,y,w,h) => `
+    <path d="${wrect(x,y,w,h)}" fill="${GLOW}" stroke="${INK}" stroke-width="1.8"/>
+    <path d="${wline(x+w/2,y+1,x+w/2,y+h-1)}" stroke="${INK}" stroke-width="1.1" fill="none"/>
+    <path d="${wline(x+1,y+h/2,x+w-1,y+h/2)}" stroke="${INK}" stroke-width="1.1" fill="none"/>`;
+  const shutters = (x,y,w,h,hue) => `
+    <path d="${wrect(x-9,y,7,h)}" fill="${hue}" opacity=".5" stroke="${INK}" stroke-width="1.2"/>
+    <path d="${wrect(x+w+2,y,7,h)}" fill="${hue}" opacity=".5" stroke="${INK}" stroke-width="1.2"/>`;
+  const flowers = (x,y,w) => `
+    <path d="${wrect(x,y,w,7)}" fill="#a97b53" stroke="${INK}" stroke-width="1.2"/>
+    ${[.2,.5,.8].map(t => `<circle cx="${x+w*t}" cy="${y-3}" r="3" fill="#d66a6a"/>`).join('')}`;
+
+  const badge = (f, cx, cy, n, fr, frAside) => n > 0
+    ? `<path d="${wcirc(cx,cy,15)}" fill="${f.hex}" stroke="${INK}" stroke-width="1.6"/>
+       <text class="floor-count" x="${cx}" y="${cy+5}" text-anchor="middle" font-size="14" fill="#fff">${n}</text>
+       ${fr > 0 ? (frAside
+          ? `<text x="${cx-22}" y="${cy+4}" text-anchor="end" font-size="10" fill="var(--fragile)">🥃 ${fr}</text>`
+          : `<text x="${cx}" y="${cy+29}" text-anchor="middle" font-size="10" fill="var(--fragile)">🥃 ${fr}</text>`) : ''}`
+    : `<text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="13" fill="${f.hex}" opacity=".6">–</text>`;
+
+  let svg = `<svg class="house-svg" viewBox="0 0 440 484" role="list" aria-label="Piani della casa">`;
+
+  /* --- cielo: sole, nuvola, uccellini --- */
+  svg += `<g class="floor-deco">
+    <circle cx="46" cy="48" r="14" fill="#f6cd63" stroke="#e8b64c" stroke-width="2"/>
+    <g stroke="#e8b64c" stroke-width="2" stroke-linecap="round" fill="none">
+      ${[0,45,90,135,180,225,270,315].map(a => {
+        const ra = a*Math.PI/180;
+        return `<path d="${wline(46+Math.cos(ra)*19, 48+Math.sin(ra)*19, 46+Math.cos(ra)*26, 48+Math.sin(ra)*26)}"/>`;
+      }).join('')}
+    </g>
+    <path d="M 362 46 q 6 -12 19 -7 q 5 -10 17 -5 q 12 -3 14 7 q 9 2 5 9 q -28 3 -55 0 q -4 -4 0 -4 Z"
+      fill="#fff" opacity=".92" stroke="${INK}" stroke-width="1.4" stroke-opacity=".55"/>
+    <g stroke="${INK}" stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".6">
+      <path d="M 132 76 q 5 -7 10 0 M 142 76 q 5 -7 10 0"/>
+      <path d="M 168 62 q 4 -6 8 0 M 176 62 q 4 -6 8 0"/>
+    </g>
+  </g>`;
+
+  /* --- comignolo con fumo (il tetto, disegnato dopo, ne copre la base) --- */
+  svg += `<g class="floor-deco">
+    <path d="${wrect(300,74,22,44)}" fill="#a97b53" stroke="${INK}" stroke-width="2"/>
+    <path d="${wline(296,74,326,74)}" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <g fill="none" stroke="#b8a98f" stroke-width="2" stroke-linecap="round">
+      <path d="M 311 64 q 9 -6 2 -13"/>
+      <path d="M 316 44 q 10 -8 2 -15"/>
+    </g>
+  </g>`;
+
+  const parts = [];
+
+  FLOORS.forEach(f => {
     const n = counts[f.id], fr = fragiles[f.id];
     const sel = selectedFloor === f.id ? 'selected' : '';
-    let shape, ly;
-
-    let labelX = X + 16, badgeX = X + FW - 34;
+    let shape = '', deco = '', label = '', bdg = '';
 
     if(f.id === 'sottotetto'){
-      /* tetto a falde: etichetta e badge rientrati per stare dentro le falde */
-      const yb = wallTop;
-      shape = `<path class="floor-fill" d="M ${X-18} ${yb} L ${X+FW/2} ${roofTop} L ${X+FW+18} ${yb} Z"
-                fill="${f.hexSoft}" stroke="${f.hex}" stroke-width="2"/>`;
-      ly = yb - 24;
-      labelX = X + 58;
-      badgeX = X + FW - 92;
+      shape = `<path class="floor-fill" d="${wp([EAVL, PEAK, EAVR])}"
+        fill="${f.hexSoft}" stroke="${INK}" stroke-width="2.6" stroke-linejoin="round"/>`;
+      deco = `
+        <path d="${wcirc(220,96,11)}" fill="${GLOW}" stroke="${INK}" stroke-width="1.8"/>
+        <path d="${wline(220,86,220,106)}" stroke="${INK}" stroke-width="1.1" fill="none"/>
+        <path d="${wline(210,96,230,96)}" stroke="${INK}" stroke-width="1.1" fill="none"/>
+        <path d="${wline(88,146,204,74)}" stroke="${INK}" stroke-width="1.2" fill="none" opacity=".3"/>
+        <path d="${wline(352,146,236,74)}" stroke="${INK}" stroke-width="1.2" fill="none" opacity=".3"/>`;
+      label = `<text class="floor-label" x="152" y="130" font-size="21" fill="${f.hex}">${f.name}</text>
+               <text class="floor-sub" x="152" y="144" font-size="12" fill="var(--ink-3)">${f.sub}</text>`;
+      bdg = badge(f, 302, 124, n, fr, true);
     } else {
-      const idx = ['studio','camere','living','taverna'].indexOf(f.id);
-      const y = wallTop + idx * FH;
-      const isTav = f.id === 'taverna';
-      shape = `<rect class="floor-fill" x="${X}" y="${y}" width="${FW}" height="${FH-4}" rx="6"
-                fill="${f.hexSoft}" stroke="${f.hex}" stroke-width="2"
-                ${isTav ? 'stroke-dasharray="7 4"' : ''}/>`;
-      /* dettagli decorativi, nella fascia libera tra etichetta e badge */
-      const wy = y + 14;
-      if(isTav){
-        shape += `<rect x="${X+188}" y="${y+16}" width="26" height="12" rx="3" fill="${f.hex}" opacity=".3"/>`;
+      const [y0, y1] = Y[f.id], h = y1 - y0, ly = y0 + h/2;
+      shape = `<path class="floor-fill" d="${wrect(L, y0, R-L, h)}"
+        fill="${f.hexSoft}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`;
+
+      if(f.id === 'studio'){
+        deco = win(240,164,24,32) + win(278,164,24,32);
+      } else if(f.id === 'camere'){
+        deco = win(240,242,22,32) + shutters(240,242,22,32,f.hex)
+             + win(282,242,22,32) + shutters(282,242,22,32,f.hex)
+             + flowers(237,276,28);
       } else if(f.id === 'living'){
-        shape += `<rect x="${X+184}" y="${y+FH-4-42}" width="26" height="42" rx="4" fill="#8a6240"/>
-                  <circle cx="${X+204}" cy="${y+FH-4-21}" r="2.2" fill="#f2c14e"/>
-                  <rect x="${X+222}" y="${wy}" width="20" height="22" rx="3" fill="${f.hex}" opacity=".3"/>`;
-      } else {
-        shape += `<rect x="${X+186}" y="${wy}" width="20" height="22" rx="3" fill="${f.hex}" opacity=".3"/>
-                  <rect x="${X+216}" y="${wy}" width="20" height="22" rx="3" fill="${f.hex}" opacity=".3"/>`;
+        deco = `
+          <path d="M ${252+jit(252,386)} 386 L 252 348 Q 252 332 271 332 Q 290 332 290 348 L ${290+jit(290,386)} 386"
+            fill="#9a6b45" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="284" cy="366" r="2.4" fill="#f2c14e"/>`
+          + win(294,320,26,30) + flowers(291,352,30);
+      } else { /* taverna: finestrella, gradini d'ingresso, pietre */
+        deco = win(196,392,24,14)
+          + `<g stroke="${INK}" stroke-width="1.3" fill="none" opacity=".35">
+               <path d="${wline(300,440,318,440)}"/><path d="${wline(310,448,328,448)}"/>
+               <path d="${wline(322,432,340,432)}"/>
+             </g>
+             <g stroke="${INK}" stroke-width="1.6" fill="none" stroke-linecap="round">
+               <path d="${wline(252,394,290,394)}"/>
+               <path d="${wline(247,402,295,402)}"/>
+               <path d="${wline(242,410,300,410)}"/>
+             </g>`;
       }
-      ly = y + FH/2;
+
+      const labY = f.id === 'taverna' ? ly + 4 : ly + 2;
+      label = `<text class="floor-label" x="100" y="${labY}" font-size="21" fill="${f.hex}">${f.name}</text>
+               <text class="floor-sub" x="100" y="${labY+16}" font-size="12" fill="var(--ink-3)">${f.sub}</text>`;
+      bdg = badge(f, 336, ly - 2, n, fr, false);
     }
 
-    const badge = n > 0
-      ? `<g>
-           <circle cx="${badgeX}" cy="${ly-2}" r="17" fill="${f.hex}"/>
-           <text class="floor-count" x="${badgeX}" y="${ly+3}" text-anchor="middle" font-size="14" fill="#fff">${n}</text>
-         </g>
-         ${fr > 0 ? (f.id === 'sottotetto'
-            ? `<text x="${badgeX-26}" y="${ly+2}" text-anchor="end" font-size="10" fill="var(--fragile)">🥃 ${fr}</text>`
-            : `<text x="${badgeX}" y="${ly+28}" text-anchor="middle" font-size="10" fill="var(--fragile)">🥃 ${fr}</text>`) : ''}`
-      : `<text x="${badgeX}" y="${ly+3}" text-anchor="middle" font-size="12" fill="${f.hex}" opacity=".55">–</text>`;
-
-    svg += `<g class="floor-shape ${sel}" data-floor="${f.id}" role="listitem" tabindex="0"
-             aria-label="${f.name}, ${n} scatole">
-      ${shape}
-      <text class="floor-label" x="${labelX}" y="${ly-2}" font-size="15" fill="${f.hex}">${f.icon} ${f.name}</text>
-      <text class="floor-sub" x="${labelX}" y="${ly+15}" font-size="10.5" fill="var(--ink-3)">${f.sub}</text>
-      ${badge}
-    </g>`;
+    parts.push(`<g class="floor-shape ${sel}" data-floor="${f.id}" role="listitem" tabindex="0"
+        aria-label="${f.name}, ${n} scatole">
+      ${shape}<g class="floor-deco">${deco}${label}${bdg}</g>
+    </g>`);
   });
 
-  /* linea del terreno solo ai lati della casa: la taverna è semi-interrata */
-  const gy = wallTop + FH*3 + Math.round(FH*0.45);
-  svg += `<line x1="8" y1="${gy}" x2="${X-8}" y2="${gy}" stroke="#7d9a5e" stroke-width="3" stroke-linecap="round"/>
-          <line x1="${X+FW+8}" y1="${gy}" x2="${W-8}" y2="${gy}" stroke="#7d9a5e" stroke-width="3" stroke-linecap="round"/>
-          <text x="12" y="${gy+16}" font-size="9.5" fill="#7d9a5e">🌱 terreno</text>`;
+  /* i piani dal basso verso l'alto, così il tetto copre la base del comignolo */
+  svg += parts.reverse().join('');
+
+  /* --- terreno: erba ai lati, terra tratteggiata attorno alla taverna, albero e cespuglio --- */
+  const tufts = [22,40,60,74, 368,388,406,424]
+    .map(x => `<path d="M ${x} ${gy} q 2 -9 4 0 M ${x+4} ${gy} q 2 -6 4 0"/>`).join('');
+  const hatch = [];
+  for(const [a,b] of [[14,L-8],[R+8,428]])
+    for(let x = a; x < b-8; x += 13){
+      hatch.push(`<path d="${wline(x, gy+7, x+8, gy+17)}"/>`);
+      hatch.push(`<path d="${wline(x+5, gy+22, x+13, gy+32)}"/>`);
+    }
+  svg += `<g class="floor-deco">
+    <g stroke="${GRASS}" fill="none" stroke-width="2.4" stroke-linecap="round">
+      <path d="${wline(10, gy, L-3, gy)}"/><path d="${wline(R+3, gy, 430, gy)}"/>${tufts}
+    </g>
+    <g stroke="${SOIL}" stroke-width="1.4" fill="none" opacity=".85">${hatch.join('')}</g>
+    <path d="${wrect(30,382,9,36)}" fill="#a97b53" stroke="${INK}" stroke-width="1.8"/>
+    <path d="${wcirc(34,360,23)}" fill="#cfe3bd" stroke="${GRASS}" stroke-width="2.2"/>
+    <circle cx="26" cy="354" r="2.6" fill="#d66a6a"/><circle cx="42" cy="366" r="2.6" fill="#d66a6a"/>
+    <path d="${wcirc(402,407,13)}" fill="#cfe3bd" stroke="${GRASS}" stroke-width="2"/>
+    <text class="floor-sub" x="418" y="446" text-anchor="end" font-size="13" fill="${GRASS}">terreno</text>
+  </g>`;
 
   svg += `</svg>`;
   $('#houseContainer').innerHTML = svg;
