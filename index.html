@@ -1333,10 +1333,24 @@ function openSyncSheet(){
   $('#syncOverlay').classList.add('open');
 }
 function closeSyncSheet(){ $('#syncOverlay').classList.remove('open'); }
-function saveSyncSettings(){
-  const repo = $('#fGhRepo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, '');
+async function saveSyncSettings(){
+  let repo = $('#fGhRepo').value.trim()
+    .replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/+$/, '');
   const token = $('#fGhToken').value.trim();
-  if(!repo || !token || !repo.includes('/')){ toast('Servono repository (utente/nome) e token'); return; }
+  if(!repo || !token){ toast('Servono repository e token'); return; }
+  if(!repo.includes('/')){
+    /* manca "utente/": lo ricaviamo dal token */
+    try {
+      const r = await fetch('https://api.github.com/user', {
+        headers: { 'authorization': 'Bearer ' + token, 'accept': 'application/vnd.github+json' },
+      });
+      if(!r.ok) throw new Error();
+      repo = (await r.json()).login + '/' + repo;
+    } catch(e) {
+      toast('Scrivi il repository come utente/nome (es. AndreaGiuliani90/' + repo + ')');
+      return;
+    }
+  }
   gh = { repo, token };
   try { localStorage.setItem(GH_LS, JSON.stringify(gh)); } catch(e){}
   closeSyncSheet();
