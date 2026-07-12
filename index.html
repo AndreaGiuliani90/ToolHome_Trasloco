@@ -492,6 +492,13 @@
         <span class="tr-go">›</span>
       </button>
 
+      <button class="toolrow" id="btnNormalize">
+        <span class="tr-ico">🔠</span>
+        <span class="tr-txt"><b>Normalizza in MAIUSCOLO</b>
+          <small>Mette codice e nome di tutte le scatole in maiuscolo, in un colpo solo. Non tocca il contenuto né le foto.</small></span>
+        <span class="tr-go">›</span>
+      </button>
+
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>
   </section>
@@ -515,7 +522,7 @@
       <div class="photodrop" id="photodrop">
         <img id="photoPreview" hidden alt="Etichetta" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
         <div class="hint" id="photoHint">📷 <b>Scatta o carica</b> la foto dell’etichetta</div>
-        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+        <input type="file" id="photoInput" accept="image/*" hidden>
       </div>
       <button class="ocrbtn aibtn" id="btnAi" hidden>✨ Leggi l’etichetta con l’AI</button>
       <button class="ocrbtn" id="btnOcr" hidden>🔤 OCR di base (senza AI)</button>
@@ -673,7 +680,7 @@ const FLOORS = [
   { id:'sottotetto', name:'Sottotetto',   sub:'mansarda',              icon:'🪜', color:'var(--f-sottotetto)', soft:'var(--f-sottotetto-soft)', hex:'#bf8a2c', hexSoft:'#f2e6cb' },
   { id:'studio',     name:'Piano Studio', sub:'terzo piano',           icon:'🖥️', color:'var(--f-studio)',     soft:'var(--f-studio-soft)',     hex:'#7c5299', hexSoft:'#e9def2' },
   { id:'camere',     name:'Piano Camere', sub:'secondo piano',         icon:'🛏️', color:'var(--f-camere)',     soft:'var(--f-camere-soft)',     hex:'#4d74a6', hexSoft:'#dfe8f2' },
-  { id:'living',     name:'Piano Living', sub:'primo piano',           icon:'🛋️', color:'var(--f-living)',     soft:'var(--f-living-soft)',     hex:'#2f7d6b', hexSoft:'#dbeae5' },
+  { id:'living',     name:'Living con Cucina', sub:'primo piano',      icon:'🛋️', color:'var(--f-living)',     soft:'var(--f-living-soft)',     hex:'#2f7d6b', hexSoft:'#dbeae5' },
   { id:'taverna',    name:'Taverna',      sub:'piano semi-interrato',  icon:'🍷', color:'var(--f-taverna)',    soft:'var(--f-taverna-soft)',    hex:'#8a6a45', hexSoft:'#ece0d0' },
 ];
 const floorById = id => FLOORS.find(f => f.id === id);
@@ -982,8 +989,8 @@ const LABEL_SCHEMA = {
   additionalProperties: false,
   required: ['code', 'name', 'contents', 'fragile', 'destination'],
   properties: {
-    code: { type: 'string', description: "Indice o codice della scatola (es. '12' o 'CUC-03'). Stringa vuota se non presente." },
-    name: { type: 'string', description: 'Nome o titolo breve della scatola. Stringa vuota se non presente.' },
+    code: { type: 'string', description: "Codice della scatola in MAIUSCOLO nel formato SIGLA-INDICE, dove SIGLA sono le prime 3 lettere della stanza di provenienza indicata sull'etichetta e INDICE è il numero della scatola con due cifre (es. 'CUC-03' per la cucina, 'CAM-01' per la camera, 'SAL-02' per il salone). Se l'etichetta riporta già un codice usalo normalizzandolo a questo formato; se manca l'indice usa '01'. Stringa vuota solo se non si capisce nulla." },
+    name: { type: 'string', description: "Nome della scatola in MAIUSCOLO: di norma coincide col codice (stesso valore del campo code). Stringa vuota se non presente." },
     contents: { type: 'string', description: "Contenuto elencato sull'etichetta, voci separate da virgola. Stringa vuota se non presente." },
     fragile: { type: 'boolean', description: "true solo se l'etichetta riporta FRAGILE o un simbolo equivalente (bicchiere, ecc.)" },
     destination: {
@@ -1017,7 +1024,7 @@ async function runAi(){
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: photoData.split(',')[1] } },
-            { type: 'text', text: "Questa è la foto dell'etichetta di uno scatolone di un trasloco, con testo in italiano spesso scritto a mano. Trascrivi fedelmente ciò che l'etichetta riporta nei campi richiesti. Non inventare informazioni che non sono scritte." },
+            { type: 'text', text: "Questa è la foto dell'etichetta di uno scatolone di un trasloco, con testo in italiano spesso scritto a mano. Trascrivi fedelmente il contenuto. Per il codice e il nome usa il formato MAIUSCOLO 'SIGLA-INDICE' basato sulla stanza di provenienza (es. cucina → CUC-03); nome e codice devono coincidere. Non inventare il contenuto che non è scritto, ma il codice puoi derivarlo dalla stanza e dal numero riportati." },
           ],
         }],
       }),
@@ -1032,8 +1039,11 @@ async function runAi(){
     const textBlock = (data.content || []).find(b => b.type === 'text');
     const out = JSON.parse(textBlock.text);
 
-    if(out.code && !$('#fCode').value) $('#fCode').value = out.code;
-    if(out.name && !$('#fName').value) $('#fName').value = out.name;
+    /* codice e nome sempre in MAIUSCOLO; se manca il nome usa il codice */
+    const aiCode = (out.code || '').toUpperCase().trim();
+    const aiName = (out.name || out.code || '').toUpperCase().trim();
+    if(aiCode && !$('#fCode').value) $('#fCode').value = aiCode;
+    if(aiName && !$('#fName').value) $('#fName').value = aiName;
     if(out.contents){
       const ta = $('#fContents');
       ta.value = ta.value ? ta.value + '\n' + out.contents : out.contents;
@@ -1231,7 +1241,8 @@ function renderHouse(){
       }
 
       const labY = f.id === 'taverna' ? ly + 4 : ly + 2;
-      label = `<text class="floor-label" x="100" y="${labY}" font-size="21" fill="${f.hex}">${f.name}</text>
+      const fsize = f.name.length > 13 ? 16 : 21;   /* nomi lunghi rimpiccioliti */
+      label = `<text class="floor-label" x="100" y="${labY}" font-size="${fsize}" fill="${f.hex}">${f.name}</text>
                <text class="floor-sub" x="100" y="${labY+16}" font-size="12" fill="var(--ink-3)">${f.sub}</text>`;
       bdg = badge(f, 336, ly - 2, n, fr, false);
     }
@@ -1303,6 +1314,23 @@ function renderFloorPanel(){
 }
 
 /* ==================== Backup ==================== */
+function normalizeBoxes(){
+  const target = boxes.filter(b =>
+    (b.code && b.code !== b.code.toUpperCase()) ||
+    (b.name && b.name !== b.name.toUpperCase()));
+  if(target.length === 0){ toast('Codici e nomi sono già in maiuscolo'); return; }
+  if(!confirm('Mettere in MAIUSCOLO codice e nome di ' + target.length +
+    (target.length === 1 ? ' scatola' : ' scatole') + '?\n\nIl contenuto e le foto non vengono toccati.')) return;
+  const now = Date.now();
+  target.forEach(b => {
+    if(b.code) b.code = b.code.toUpperCase();
+    if(b.name) b.name = b.name.toUpperCase();
+    b.updatedAt = now;
+  });
+  save(); renderAll(); scheduleSync();
+  toast('🔠 ' + target.length + (target.length === 1 ? ' scatola normalizzata' : ' scatole normalizzate'));
+}
+
 function exportBackup(){
   const blob = new Blob([JSON.stringify({ v:1, exportedAt:new Date().toISOString(), boxes }, null, 1)],
     { type:'application/json' });
@@ -1713,6 +1741,7 @@ document.addEventListener('keydown', e => {
 
 $('#btnExport').onclick = exportBackup;
 $('#btnImport').onclick = () => $('#importFile').click();
+$('#btnNormalize').onclick = normalizeBoxes;
 $('#importFile').onchange = e => { if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; };
 
 fillDestSelect();
