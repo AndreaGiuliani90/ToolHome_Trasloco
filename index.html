@@ -34,6 +34,9 @@
     --f-studio:#7c5299;    --f-studio-soft:#e9def2;
     --f-sottotetto:#bf8a2c;--f-sottotetto-soft:#f2e6cb;
 
+    /* colori del disegno della casa (tema-dipendenti) */
+    --draw-ink:#33403a; --draw-glow:#f2d98a; --draw-grass:#5f8a6a; --draw-soil:#b9bdaf;
+
     --radius:10px;
     --shadow:0 1px 2px rgba(27,32,29,.05), 0 4px 12px rgba(27,32,29,.06);
     --shadow-lg:0 4px 14px rgba(27,32,29,.09), 0 16px 40px rgba(27,32,29,.14);
@@ -42,6 +45,43 @@
     --mono:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
     --eyebrow:.07em;          /* letter-spacing per etichette in maiuscolo */
   }
+
+  /* ===== Tema NOTTE (scuro) ===== */
+  :root[data-theme="notte"]{
+    --paper:#161b22;  --paper-2:#1f2630;  --card:#212a35;
+    --ink:#e7ecf1;    --ink-2:#a9b4bf;    --ink-3:#7d8894;
+    --line:#333d49;
+    --accent:#6ea8e0; --accent-soft:#233242;
+    --tape:#d6a24e; --tape-soft:#3a3322;
+    --fragile:#e8705f; --fragile-soft:#3d2723;
+    --ok:#5bbd88;
+    --f-taverna:#c39a6a; --f-taverna-soft:#332a20;
+    --f-living:#5fbfa6;  --f-living-soft:#1e2f2b;
+    --f-camere:#6fa2dd;  --f-camere-soft:#1f2b3a;
+    --f-studio:#b18bd0;  --f-studio-soft:#2b2338;
+    --f-sottotetto:#e0b354; --f-sottotetto-soft:#332a1a;
+    --draw-ink:#c3ccd4; --draw-glow:#e0b354; --draw-grass:#5fbf8a; --draw-soil:#4a5560;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.35);
+    --shadow-lg:0 4px 14px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.5);
+  }
+
+  /* ===== Tema BOTANICO (chiaro, accento verde) ===== */
+  :root[data-theme="botanico"]{
+    --paper:#eef1e9;  --paper-2:#e3e8da;  --card:#fcfdf9;
+    --ink:#20261d;    --ink-2:#4f5a44;    --ink-3:#5a6450;
+    --line:#d3d9c6;
+    --accent:#3f7d54; --accent-soft:#dcecdd;
+    --tape:#b98a3c;   --tape-soft:#efe3cb;
+    --fragile:#c0453a; --fragile-soft:#f6ddd8;
+    --ok:#3f7d54;
+    --f-taverna:#8a6a45; --f-taverna-soft:#ece0d0;
+    --f-living:#3f8a63;  --f-living-soft:#dcebde;
+    --f-camere:#5a86a0;  --f-camere-soft:#e0eaef;
+    --f-studio:#8a6aa0;  --f-studio-soft:#e9e1f0;
+    --f-sottotetto:#c39a3f; --f-sottotetto-soft:#f1e8cd;
+    --draw-ink:#2f3a2a; --draw-glow:#e6cf82; --draw-grass:#5f9a5f; --draw-soil:#b6bda6;
+  }
+
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{
@@ -372,6 +412,26 @@
 
   /* ============ Toolbar (backup) ============ */
   .tools{max-width:560px;margin:8px auto 0}
+  .tools-section{
+    font-family:var(--mono);font-size:.72rem;color:var(--ink-2);
+    text-transform:uppercase;letter-spacing:var(--eyebrow);font-weight:600;
+    margin:6px 2px 10px;
+  }
+  .tools-section + .tools-section,.theme-picker + .tools-section{margin-top:22px}
+  .theme-picker{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
+  .theme-card{
+    display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+    background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);
+    padding:10px 13px;cursor:pointer;font:inherit;color:var(--ink);transition:border-color .15s;
+  }
+  .theme-card:hover{border-color:var(--accent)}
+  .theme-card.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .theme-card .sw{display:flex;flex:none;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .theme-card .sw i{width:19px;height:36px;display:block}
+  .theme-card .theme-meta{flex:1;min-width:0}
+  .theme-card .theme-meta b{display:block;font-size:.95rem}
+  .theme-card .theme-meta small{color:var(--ink-2);font-size:.8rem}
+  .theme-card .theme-check{flex:none;color:var(--accent);font-weight:800;font-size:1.15rem;width:18px;text-align:center}
   .toolrow{
     width:100%;display:flex;align-items:center;gap:13px;text-align:left;
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
@@ -457,6 +517,10 @@
   <!-- ==================== VISTA IMPOSTAZIONI ==================== -->
   <section class="view" id="view-settings">
     <div class="tools">
+      <div class="tools-section">🎨 Aspetto</div>
+      <div class="theme-picker" id="themePicker"></div>
+
+      <div class="tools-section">Dati e accesso</div>
       <button class="toolrow" id="btnSync">
         <span class="tr-ico">☁️</span>
         <span class="tr-txt"><b>Sincronizza tra dispositivi</b>
@@ -684,6 +748,69 @@ const FLOORS = [
   { id:'taverna',    name:'Taverna',      sub:'piano semi-interrato',  icon:'🍷', color:'var(--f-taverna)',    soft:'var(--f-taverna-soft)',    hex:'#8a6a45', hexSoft:'#ece0d0' },
 ];
 const floorById = id => FLOORS.find(f => f.id === id);
+
+/* colori del disegno casa, riletti dal tema attivo */
+let DRAW = { ink:'#33403a', glow:'#f2d98a', grass:'#5f8a6a', soil:'#b9bdaf' };
+function refreshFloorColors(){
+  const cs = getComputedStyle(document.documentElement);
+  const v = n => cs.getPropertyValue(n).trim();
+  FLOORS.forEach(f => {
+    f.hex = v('--f-' + f.id) || f.hex;
+    f.hexSoft = v('--f-' + f.id + '-soft') || f.hexSoft;
+  });
+  DRAW = {
+    ink:  v('--draw-ink')  || DRAW.ink,
+    glow: v('--draw-glow') || DRAW.glow,
+    grass:v('--draw-grass')|| DRAW.grass,
+    soil: v('--draw-soil') || DRAW.soil,
+  };
+}
+
+/* ==================== Temi grafici (aspetto) ==================== */
+const THEMES = [
+  { id:'manifest', name:'Manifest',  desc:'Carta fredda, blu inchiostro (attuale)', sw:['#e7eae4','#274a7a','#b07c34','#1b201d'] },
+  { id:'notte',    name:'Notte',     desc:'Scuro, riposa gli occhi',                sw:['#161b22','#6ea8e0','#d6a24e','#e7ecf1'] },
+  { id:'botanico', name:'Botanico',  desc:'Chiaro, accento verde',                  sw:['#eef1e9','#3f7d54','#b98a3c','#20261d'] },
+];
+const THEME_LS = 'trasloco.theme';
+const currentTheme = () => document.documentElement.getAttribute('data-theme') || 'manifest';
+
+function updateThemeColorMeta(){
+  const p = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+  const m = document.querySelector('meta[name="theme-color"]');
+  if(m && p) m.setAttribute('content', p);
+}
+function setThemeAttr(id){
+  if(id === 'manifest') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', id);
+  refreshFloorColors();
+  updateThemeColorMeta();
+}
+function initTheme(){
+  let saved = 'manifest';
+  try { saved = localStorage.getItem(THEME_LS) || 'manifest'; } catch(e){}
+  if(!THEMES.find(t => t.id === saved)) saved = 'manifest';
+  setThemeAttr(saved);
+}
+function applyTheme(id){
+  const t = THEMES.find(x => x.id === id) ? id : 'manifest';
+  setThemeAttr(t);
+  try { localStorage.setItem(THEME_LS, t); } catch(e){}
+  renderAll(); renderThemePicker();
+  toast('🎨 Tema: ' + (THEMES.find(x => x.id === t)?.name || t));
+}
+function renderThemePicker(){
+  const el = $('#themePicker'); if(!el) return;
+  const cur = currentTheme();
+  el.innerHTML = THEMES.map(t => `
+    <button class="theme-card ${t.id===cur?'active':''}" data-theme-id="${t.id}" aria-pressed="${t.id===cur}">
+      <span class="sw">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span>
+      <span class="theme-meta"><b>${t.name}</b><small>${t.desc}</small></span>
+      <span class="theme-check">${t.id===cur?'✓':''}</span>
+    </button>`).join('');
+  el.querySelectorAll('.theme-card').forEach(c =>
+    c.onclick = () => applyTheme(c.dataset.themeId));
+}
 
 /* ==================== Stato ==================== */
 const LS_KEY = 'trasloco.boxes.v1';
@@ -1110,7 +1237,7 @@ function renderHouse(){
     }
   });
 
-  const INK = '#33403a', GLOW = '#f2d98a', GRASS = '#5f8a6a', SOIL = '#b9bdaf';
+  const INK = DRAW.ink, GLOW = DRAW.glow, GRASS = DRAW.grass, SOIL = DRAW.soil;
   const L = 84, R = 356, PEAK = [220,52], EAVL = [64,148], EAVR = [376,148];
   const gy = 418;                         /* linea del terreno */
   const Y = { studio:[148,226], camere:[226,304], living:[304,386], taverna:[386,458] };
@@ -1744,8 +1871,10 @@ $('#btnImport').onclick = () => $('#importFile').click();
 $('#btnNormalize').onclick = normalizeBoxes;
 $('#importFile').onchange = e => { if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; };
 
+initTheme();
 fillDestSelect();
 renderAll();
+renderThemePicker();
 maybeShowInvite();
 if(ghOn() && !pendingInvite) syncNow();
 </script>
